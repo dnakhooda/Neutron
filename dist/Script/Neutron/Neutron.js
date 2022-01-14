@@ -449,7 +449,7 @@ export var Neutron;
             SpriteObjects.Effects = Effects;
             class Collision {
                 constructor(me) {
-                    this.touchingSprite = () => Neutron.getGame().getSprites.filter(sprite => this.touching(this.me) && sprite !== this.me);
+                    this.touchingSprite = () => Neutron.getGame().getSprites.filter(sprite => this.touching(sprite) && sprite !== this.me);
                     this.me = me;
                 }
                 touching(other) {
