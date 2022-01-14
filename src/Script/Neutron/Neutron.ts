@@ -602,7 +602,7 @@ export namespace Neutron {
                     this.me = me;
                 }
 
-                touchingSprite = () => getGame().getSprites.filter(sprite => this.touching(this.me) && sprite !== this.me);
+                touchingSprite = () => getGame().getSprites.filter(sprite => this.touching(sprite) && sprite !== this.me);
                 
                 touching(other:Sprite) {
                     if (this.me.getMovement.getX < other.getMovement.getX + other.getDimensions.getWidth &&
