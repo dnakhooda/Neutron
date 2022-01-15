@@ -206,6 +206,9 @@ export namespace Neutron {
             if (!object.getEffect.getHidden) {
                 this.getCtx.globalAlpha = 1 - (object.getEffect.getTransparency / 100);
                 this.getCtx.fillStyle = object.getColor;
+                this.getCtx.translate((object.getMovement.getX + object.getDimensions.getWidth/2), (object.getMovement.getY + object.getDimensions.getHeight/2));
+                this.getCtx.rotate(object.getRotation * Math.PI / 180);
+                this.getCtx.translate(-(object.getMovement.getX + object.getDimensions.getWidth/2), -(object.getMovement.getY + object.getDimensions.getHeight/2));
                 this.getCtx.fillRect(object.getMovement.getX - getGame().getCamera.getX, object.getMovement.getY - getGame().getCamera.getY, object.getDimensions.getWidth, object.getDimensions.getHeight);
             }
         }
@@ -623,6 +626,8 @@ export namespace Neutron {
 
             private stageLevel:number;
 
+            private rotation:number = 0;
+
             private movement = new SpriteObjects.Movement(this);
 
             private dimensions = new SpriteObjects.Dimensions();
@@ -662,7 +667,10 @@ export namespace Neutron {
             set setColor(_val:string) { this.color = _val }
             
             get getStageLevel() { return this.stageLevel }
-            set setStageLevel(_val:number) { this.stageLevel=_val }
+            set setStageLevel(_val:number) { this.stageLevel = _val }
+
+            get getRotation() { return this.rotation }
+            set setRotation(_val:number) { this.rotation = _val }
 
             get getId() { return this.id }
 
@@ -683,8 +691,8 @@ export namespace Neutron {
     const engine = new Engine();
 
     export const getEngine = () => engine;
-    export declare let getLoader:() => Loader;
-    export declare let getRender:() => RenderExtension;
-    export declare let getGame:() => GameExtension;
-    export declare let getController:() => Controller;
+    export let getLoader:() => Loader;
+    export let getRender:() => RenderExtension;
+    export let getGame:() => GameExtension;
+    export let getController:() => Controller;
 }

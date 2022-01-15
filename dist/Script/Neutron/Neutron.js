@@ -147,6 +147,9 @@ export var Neutron;
             if (!object.getEffect.getHidden) {
                 this.getCtx.globalAlpha = 1 - (object.getEffect.getTransparency / 100);
                 this.getCtx.fillStyle = object.getColor;
+                this.getCtx.translate((object.getMovement.getX + object.getDimensions.getWidth / 2), (object.getMovement.getY + object.getDimensions.getHeight / 2));
+                this.getCtx.rotate(object.getRotation * Math.PI / 180);
+                this.getCtx.translate(-(object.getMovement.getX + object.getDimensions.getWidth / 2), -(object.getMovement.getY + object.getDimensions.getHeight / 2));
                 this.getCtx.fillRect(object.getMovement.getX - Neutron.getGame().getCamera.getX, object.getMovement.getY - Neutron.getGame().getCamera.getY, object.getDimensions.getWidth, object.getDimensions.getHeight);
             }
         }
@@ -465,6 +468,7 @@ export var Neutron;
         })(SpriteObjects || (SpriteObjects = {}));
         class Sprite {
             constructor(id, x, y, width, height, color, stageLevel) {
+                this.rotation = 0;
                 this.movement = new SpriteObjects.Movement(this);
                 this.dimensions = new SpriteObjects.Dimensions();
                 this.costumes = new SpriteObjects.Costumes();
@@ -491,6 +495,8 @@ export var Neutron;
             set setColor(_val) { this.color = _val; }
             get getStageLevel() { return this.stageLevel; }
             set setStageLevel(_val) { this.stageLevel = _val; }
+            get getRotation() { return this.rotation; }
+            set setRotation(_val) { this.rotation = _val; }
             get getId() { return this.id; }
             get getMovement() { return this.movement; }
             get getDimensions() { return this.dimensions; }
