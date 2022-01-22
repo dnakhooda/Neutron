@@ -16,7 +16,7 @@ import { Game } from "../MainClasses/Game.js";
         draw: draw,
         init: init,
         load: load,
-        tps: 80,
+        tps: 75,
         render: render,
         game: game,
         controller: controller,

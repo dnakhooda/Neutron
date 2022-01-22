@@ -28,7 +28,6 @@ export var Neutron;
                         if (this.higherPreformanceUpdateLoop)
                             this.update();
                         Neutron.getRender().getDrawFunction();
-                        this.draw();
                     }
                     else {
                         if (Neutron.getLoader().getNumberOfAssetsToLoad === 0)
@@ -82,6 +81,7 @@ export var Neutron;
     class Render {
         constructor(canvas, draw, dpr) {
             this.showExtraInfo = false;
+            this.extraInfoColor = `#fff`;
             this.zoomVal = 1;
             this.fullScreenRatio = null;
             this.canvas = canvas;
@@ -103,7 +103,7 @@ export var Neutron;
                 const image = Neutron.getGame().getBackgroundImage;
                 this.getCtx.save();
                 if (image === null) {
-                    this.getCtx.fillStyle = `black`;
+                    this.getCtx.fillStyle = `#000`;
                     this.getCtx.fillRect(0, 0, this.getWidth, this.getHeight);
                 }
                 else {
@@ -118,10 +118,10 @@ export var Neutron;
                 });
                 this.draw();
                 if (this.showExtraInfo) {
-                    this.getCtx.fillStyle = `white`;
-                    this.getCtx.font = `24px serif`;
-                    this.getCtx.fillText(`FPS: ${Neutron.getEngine().getFps}`, 20, 40);
-                    this.getCtx.fillText(`TPS: ${Neutron.getEngine().getTps}`, 20, 80);
+                    this.getCtx.fillStyle = this.extraInfoColor;
+                    this.getCtx.font = `${24 * this.dpr}px serif`;
+                    this.getCtx.fillText(`FPS: ${Neutron.getEngine().getFps}`, 20 * this.dpr, 40 * this.dpr);
+                    this.getCtx.fillText(`TPS: ${Neutron.getEngine().getTps}`, 20 * this.dpr, 80 * this.dpr);
                 }
                 this.getCtx.restore();
             };
@@ -151,19 +151,25 @@ export var Neutron;
                 this.getCtx.rotate(object.getRotation * Math.PI / 180);
                 this.getCtx.translate(-(object.getMovement.getX + object.getDimensions.getWidth / 2), -(object.getMovement.getY + object.getDimensions.getHeight / 2));
                 this.getCtx.fillRect(object.getMovement.getX - Neutron.getGame().getCamera.getX, object.getMovement.getY - Neutron.getGame().getCamera.getY, object.getDimensions.getWidth, object.getDimensions.getHeight);
+                this.getCtx.setTransform(1, 0, 0, 1, 0, 0);
             }
         }
         drawSpriteImage(object, image) {
             if (!object.getEffect.getHidden) {
                 this.getCtx.globalAlpha = 1 - (object.getEffect.getTransparency / 100);
                 this.getCtx.fillStyle = object.getColor;
+                this.getCtx.translate((object.getMovement.getX + object.getDimensions.getWidth / 2), (object.getMovement.getY + object.getDimensions.getHeight / 2));
+                this.getCtx.rotate(object.getRotation * Math.PI / 180);
+                this.getCtx.translate(-(object.getMovement.getX + object.getDimensions.getWidth / 2), -(object.getMovement.getY + object.getDimensions.getHeight / 2));
                 this.getCtx.drawImage(image, object.getMovement.getX - Neutron.getGame().getCamera.getX, object.getMovement.getY - Neutron.getGame().getCamera.getY, object.getDimensions.getWidth, object.getDimensions.getHeight);
+                this.getCtx.setTransform(1, 0, 0, 1, 0, 0);
             }
         }
         drawSpriteWithInputs(x, y, width, height, color) {
             this.getCtx.fillStyle = color;
             this.getCtx.fillRect(x, y, width, height);
         }
+        set setExtraInfoColor(_val) { this.extraInfoColor = _val; }
         get getDrawFunction() { return this.drawFunction().bind(this); }
         get getCanvas() { return this.canvas; }
         get getWidth() { return this.canvas.width / (this.getCanvasZoom / 100); }
@@ -305,6 +311,10 @@ export var Neutron;
             const sprites = this.sprites;
             return sprites.filter(sprite => sprite instanceof arg);
         }
+        getPlatformerSprites() {
+            const sprites = this.sprites;
+            return sprites.filter(sprite => sprite instanceof Sprites.Platformer);
+        }
         setDynamicBackgroundImage(image, x, y, width, height) {
             const background = new Sprites.Sprite(`background`, x, y, width, height, `#fff`, 0);
             background.getCostumes.addCostume(`set`, image);
@@ -341,12 +351,6 @@ export var Neutron;
     }
     let Sprites;
     (function (Sprites) {
-        let ScreenPlaces;
-        (function (ScreenPlaces) {
-            ScreenPlaces[ScreenPlaces["randomPosition"] = 0] = "randomPosition";
-            ScreenPlaces[ScreenPlaces["center"] = 1] = "center";
-        })(ScreenPlaces = Sprites.ScreenPlaces || (Sprites.ScreenPlaces = {}));
-        ;
         let SpriteObjects;
         (function (SpriteObjects) {
             class Costumes {
@@ -398,10 +402,10 @@ export var Neutron;
                 }
                 to(place) {
                     switch (place) {
-                        case ScreenPlaces.center:
+                        case Enums.ScreenPlaces.center:
                             this.goTo(Neutron.getRender().getWidth / 2 - this.me.getDimensions.getWidth / 2, Neutron.getRender().getHeight / 2 - this.me.getDimensions.getHeight / 2);
                             break;
-                        case ScreenPlaces.randomPosition:
+                        case Enums.ScreenPlaces.randomPosition:
                             this.goTo(Math.floor(Math.random() * Neutron.getRender().getWidth), Math.floor(Math.random() * Neutron.getRender().getHeight));
                             break;
                     }
@@ -463,6 +467,30 @@ export var Neutron;
                         return true;
                     return false;
                 }
+                getSpriteAboveSelf() {
+                    this.me.getMovement.setY = this.me.getMovement.getY - 1;
+                    const touchingSprites = Neutron.getGame().getSprites.filter(sprite => this.me.getCollision.touching(sprite) && this.me !== sprite);
+                    this.me.getMovement.setY = this.me.getMovement.getY + 1;
+                    return touchingSprites;
+                }
+                getSpriteBelowSelf() {
+                    this.me.getMovement.setY = this.me.getMovement.getY + 1;
+                    const touchingSprites = Neutron.getGame().getSprites.filter(sprite => this.me.getCollision.touching(sprite) && this.me !== sprite);
+                    this.me.getMovement.setY = this.me.getMovement.getY - 1;
+                    return touchingSprites;
+                }
+                getSpriteLeftSelf() {
+                    this.me.getMovement.setX = this.me.getMovement.getX - 1;
+                    const touchingSprites = Neutron.getGame().getSprites.filter(sprite => this.me.getCollision.touching(sprite) && this.me !== sprite);
+                    this.me.getMovement.setX = this.me.getMovement.getX + 1;
+                    return touchingSprites;
+                }
+                getSpriteRightSelf() {
+                    this.me.getMovement.setX = this.me.getMovement.getX + 1;
+                    const touchingSprites = Neutron.getGame().getSprites.filter(sprite => this.me.getCollision.touching(sprite) && this.me !== sprite);
+                    this.me.getMovement.setX = this.me.getMovement.getX - 1;
+                    return touchingSprites;
+                }
             }
             SpriteObjects.Collision = Collision;
         })(SpriteObjects || (SpriteObjects = {}));
@@ -506,7 +534,156 @@ export var Neutron;
             get getSounds() { return this.sounds; }
         }
         Sprites.Sprite = Sprite;
+        class Platformer extends Sprite {
+            constructor(id, x, y, width, height, color, stageLevel) {
+                super(id, x, y, width, height, color, stageLevel);
+                this.vx = 0;
+                this.vxSpeed = 0.5;
+                this.maxVX = null;
+                this.vy = 0;
+                this.vySpeed = 0.5;
+                this.maxVY = null;
+                this.gravityAcc = 0.2;
+                this.hasPlatformerBelow = false;
+                this.checkAllCollision = true;
+                this.platformersToCheckCollision = Neutron.getGame().getPlatformerSprites();
+            }
+            doGravity() {
+                this.hasPlatformerBelow = false;
+                this.getMovement.setY = this.getMovement.getY + this.getVY;
+                if (this.checkAllCollision)
+                    this.platformersToCheckCollision = Neutron.getGame().getPlatformerSprites();
+                this.platformersToCheckCollision.forEach(platformer => {
+                    if (this.getCollision.touching(platformer) && this !== platformer) {
+                        if (this.getVY < 0)
+                            this.getMovement.setY = platformer.getMovement.getY + platformer.getDimensions.getHeight;
+                        else {
+                            this.getMovement.setY = platformer.getMovement.getY - this.getDimensions.getHeight;
+                            this.hasPlatformerBelow = true;
+                        }
+                        if (this.getCollision.touching(platformer))
+                            this.getMovement.setY = this.getMovement.getY + 0.1;
+                        this.setVY = 0;
+                    }
+                });
+                if (!this.hasPlatformerBelow)
+                    this.setVY = this.getVY + this.getGravityAcc;
+                else
+                    this.setVY = 0;
+            }
+            moveX(x) {
+                this.getMovement.setX = this.getMovement.getX + x;
+                if (this.checkAllCollision)
+                    this.platformersToCheckCollision = Neutron.getGame().getPlatformerSprites();
+                const touchingPlatformers = this.platformersToCheckCollision.filter(platformer => this.getCollision.touching(platformer) && this !== platformer);
+                touchingPlatformers.forEach(platformer => {
+                    if (x > 0)
+                        this.getMovement.setX = platformer.getMovement.getX - this.getDimensions.getWidth;
+                    else
+                        this.getMovement.setX = platformer.getMovement.getX + platformer.getDimensions.getWidth;
+                });
+            }
+            moveY(y) {
+                this.getMovement.setY = this.getMovement.getY + y;
+                if (this.checkAllCollision)
+                    this.platformersToCheckCollision = Neutron.getGame().getPlatformerSprites();
+                const touchingPlatformers = this.platformersToCheckCollision.filter(platformer => this.getCollision.touching(platformer) && this !== platformer);
+                touchingPlatformers.forEach(platformer => {
+                    if (y > 0)
+                        this.getMovement.setY = platformer.getMovement.getY - this.getDimensions.getHeight;
+                    else
+                        this.getMovement.setY = platformer.getMovement.getY + platformer.getDimensions.getHeight;
+                });
+            }
+            doJump(jumpHeight) {
+                if (this.getPlatformerBelowSelf().length > 0)
+                    this.setVY = -jumpHeight;
+            }
+            getPlatformerAboveSelf() {
+                this.getMovement.setY = this.getMovement.getY - 1;
+                const touchingPlatformers = Neutron.getGame().getPlatformerSprites().filter(sprite => this.getCollision.touching(sprite) && this !== sprite);
+                this.getMovement.setY = this.getMovement.getY + 1;
+                return touchingPlatformers;
+            }
+            getPlatformerBelowSelf() {
+                this.getMovement.setY = this.getMovement.getY + 1;
+                const touchingPlatformers = Neutron.getGame().getPlatformerSprites().filter(sprite => this.getCollision.touching(sprite) && this !== sprite);
+                this.getMovement.setY = this.getMovement.getY - 1;
+                return touchingPlatformers;
+            }
+            getPlatformerLeftSelf() {
+                this.getMovement.setX = this.getMovement.getX - 1;
+                const touchingPlatformers = Neutron.getGame().getPlatformerSprites().filter(sprite => this.getCollision.touching(sprite) && this !== sprite);
+                this.getMovement.setX = this.getMovement.getX + 1;
+                return touchingPlatformers;
+            }
+            getPlatformerRightSelf() {
+                this.getMovement.setX = this.getMovement.getX + 1;
+                const touchingPlatformers = Neutron.getGame().getPlatformerSprites().filter(sprite => this.getCollision.touching(sprite) && this !== sprite);
+                this.getMovement.setX = this.getMovement.getX - 1;
+                return touchingPlatformers;
+            }
+            addFrictionX(friction) {
+                this.setVX = this.vx * friction;
+                if (Math.abs(this.getVX) < 0.3)
+                    this.setVX = 0;
+            }
+            addFrictionY(friction) {
+                this.setVY = this.vy * friction;
+                if (Math.abs(this.getVY) < 0.3)
+                    this.setVY = 0;
+            }
+            get getVX() { return this.vx; }
+            set setVX(_val) {
+                this.vx = _val;
+                this.vx = Number(this.vx.toFixed(1));
+                if (this.maxVX !== null && this.vx > this.maxVX)
+                    this.vx = this.maxVX;
+                else if (this.maxVX !== null && this.vx < -this.maxVX)
+                    this.vx = -this.maxVX;
+            }
+            get getVXSpeed() { return this.vxSpeed; }
+            set setVXSpeed(_val) {
+                this.vxSpeed = _val;
+                this.vxSpeed = Number(this.vxSpeed.toFixed(1));
+            }
+            get getMaxVX() { return this.maxVX; }
+            set setMaxVX(_val) { this.maxVX = _val; }
+            get getVY() { return this.vy; }
+            set setVY(_val) {
+                this.vy = _val;
+                this.vy = Number(this.vy.toFixed(1));
+                if (this.maxVY !== null && this.vy > this.maxVY)
+                    this.vy = this.maxVY;
+                else if (this.maxVY !== null && this.vy < -this.maxVY)
+                    this.vy = -this.maxVY;
+            }
+            get getVYSpeed() { return this.vySpeed; }
+            set setVYSpeed(_val) {
+                this.vySpeed = _val;
+                this.vySpeed = Number(this.vySpeed.toFixed(1));
+            }
+            get getMaxVY() { return this.maxVY; }
+            set setMaxVY(_val) { this.maxVY = _val; }
+            get getGravityAcc() { return this.gravityAcc; }
+            set setGravityAcc(_val) { this.gravityAcc = _val; }
+            get getPlatformersToCheckCollision() { return this.platformersToCheckCollision; }
+            set setPlatformerSpritesToCheckCollisionWith(_val) {
+                this.platformersToCheckCollision = _val;
+                if (_val !== Neutron.getGame().getPlatformerSprites())
+                    this.checkAllCollision = false;
+            }
+        }
+        Sprites.Platformer = Platformer;
     })(Sprites = Neutron.Sprites || (Neutron.Sprites = {}));
+    let Enums;
+    (function (Enums) {
+        let ScreenPlaces;
+        (function (ScreenPlaces) {
+            ScreenPlaces[ScreenPlaces["randomPosition"] = 0] = "randomPosition";
+            ScreenPlaces[ScreenPlaces["center"] = 1] = "center";
+        })(ScreenPlaces = Enums.ScreenPlaces || (Enums.ScreenPlaces = {}));
+    })(Enums = Neutron.Enums || (Neutron.Enums = {}));
     const engine = new Engine();
     Neutron.getEngine = () => engine;
 })(Neutron || (Neutron = {}));

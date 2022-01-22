@@ -20,7 +20,7 @@ import { Game } from "../MainClasses/Game.js";
             init: init,
             load: load,
 
-            tps: 80,
+            tps: 75,
 
             render: render,
             game: game,

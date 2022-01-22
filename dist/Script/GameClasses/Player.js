@@ -1,20 +1,20 @@
 import { Neutron } from "../Neutron/Neutron.js";
-export class Player extends Neutron.Sprites.Sprite {
+export class Player extends Neutron.Sprites.Platformer {
     constructor(x, y) {
         super(`player`, x, y, 80, 80, `blue`, 10);
-        // Setting Variables
-        this.speed = 10;
+        this.setMaxVX = 10;
+        this.setVXSpeed = 4;
+        this.setGravityAcc = 0.5;
     }
     // Player Movement
     doMovement() {
         if (Neutron.getController().getKey(`a`))
-            this.getMovement.setX = this.getMovement.getX - this.speed;
+            this.setVX = this.getVX - this.getVXSpeed;
         if (Neutron.getController().getKey(`d`))
-            this.getMovement.setX = this.getMovement.getX + this.speed;
-        if (Neutron.getController().getKey(`w`))
-            this.getMovement.setY = this.getMovement.getY - this.speed;
-        if (Neutron.getController().getKey(`s`))
-            this.getMovement.setY = this.getMovement.getY + this.speed;
+            this.setVX = this.getVX + this.getVXSpeed;
+        if (Neutron.getController().getKey(` `))
+            this.doJump(18);
+        this.moveX(this.getVX);
     }
     // Player Movement Constraints
     movementConstraints() {
@@ -27,6 +27,4 @@ export class Player extends Neutron.Sprites.Sprite {
         if (this.getMovement.getY + this.getDimensions.getHeight > Neutron.getRender().getHeight)
             this.getMovement.setY = Neutron.getRender().getHeight - this.getDimensions.getHeight;
     }
-    // Setting Getters and Setters
-    get getSpeed() { return this.speed; }
 }
