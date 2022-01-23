@@ -254,8 +254,8 @@ export namespace Neutron {
 
         private keysDown:{ [key: string]: boolean; } = {};
 
-        private mouseX:number|null = null;
-        private mouseY:number|null = null;
+        private mouseX:number | null = null;
+        private mouseY:number | null = null;
 
         private eventObject:Events;
 
@@ -319,7 +319,7 @@ export namespace Neutron {
         private images:[string, HTMLImageElement][] = [];
         private assetsToLoad = 0;
 
-        loadImage(id:string,src:string) {
+        loadImage(id:string, src:string) {
             let image = new Image();
             image.src = src;
             this.images.push( [id, image] );
@@ -327,7 +327,7 @@ export namespace Neutron {
             this.assetsToLoad ++;
         }
 
-        getLoadedImageById = (id:string):HTMLImageElement|null => (this.images.filter(image => image[0] === id))[0][1];
+        getLoadedImageById = (id:string) => (this.images.filter(image => image[0] === id))[0][1];
 
         get getNumberOfAssetsToLoad() { return this.assetsToLoad }
     }
@@ -335,7 +335,7 @@ export namespace Neutron {
     export class Game {
         private sprites:Sprites.Sprite[] = [];
 
-        private background:HTMLImageElement|null = null;
+        private background:HTMLImageElement | null = null;
 
         private camera = new Camera();
 
@@ -402,11 +402,11 @@ export namespace Neutron {
             getEngine().start();
         }
         
-        getLocationOnImageMap(x:number,y:number) {
+        getLocationOnImageMap(x:number, y:number) {
             const ctx = this.mapReaderCanvas.getContext(`2d`);
 
             if (ctx === null)
-                    throw new Error(`Image map canvas ctx null!`);
+                throw new Error(`Image map canvas ctx null!`);
 
             ctx.getImageData(x, y, 1, 1);
         }
@@ -421,7 +421,7 @@ export namespace Neutron {
             this.sprites = this.sortSprites(this.sprites);
         }
 
-        getSpriteById = (id:string):Sprites.Sprite => this.sprites.filter(sprite => sprite.getId === id)[0];
+        getSpriteById = (id:string) => this.sprites.filter(sprite => sprite.getId === id)[0];
 
         getSpritesByType <T>(arg:any):T[] {
             const sprites:any[] = this.sprites;
@@ -468,8 +468,8 @@ export namespace Neutron {
     }
 
     class Camera {
-        private x:number = 0;
-        private y:number = 0;
+        private x = 0;
+        private y = 0;
         
         goTo(_valx:number,_valy:number) {
             this.setX = _valx;
@@ -535,8 +535,8 @@ export namespace Neutron {
             export class Movement {
                 private me:Sprite;
 
-                private x:number = 0;
-                private y:number = 0;
+                private x = 0;
+                private y = 0;
 
                 constructor (me:Sprite) {
                     this.me = me;
@@ -667,7 +667,7 @@ export namespace Neutron {
 
             private stageLevel:number;
 
-            private rotation:number = 0;
+            private rotation = 0;
 
             private movement = new SpriteObjects.Movement(this);
 
@@ -732,11 +732,11 @@ export namespace Neutron {
 
             private vx = 0;
             private vxSpeed = 0.5;
-            private maxVX: number|null = null;
+            private maxVX: number | null = null;
 
             private vy = 0;
             private vySpeed = 0.5;
-            private maxVY: number|null = null;
+            private maxVY: number | null = null;
 
             private gravityAcc = 0.2;
 
