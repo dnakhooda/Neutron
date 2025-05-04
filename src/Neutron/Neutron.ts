@@ -185,7 +185,7 @@ export namespace Neutron {
         this.accumulatedTime = this.minFrameTime * 5;
       }
 
-      (getRender().getDrawFunction())();
+      getRender().getDrawFunction()();
 
       window.requestAnimationFrame(this.startLoop);
     };
@@ -326,6 +326,12 @@ export namespace Neutron {
         }
 
         getGame()
+          .getParticles()
+          .forEach((particle) => {
+            this.drawParticle(particle);
+          });
+
+        getGame()
           .getSprites()
           .filter((obj: Sprite) => obj.isOnScreen())
           .forEach((obj: Sprite) => {
@@ -423,6 +429,36 @@ export namespace Neutron {
           }
           this.ctx.setTransform(1, 0, 0, 1, 0, 0);
         }
+      }
+    }
+
+    /**
+     * Draws a particle.
+     * @param particle - The particle to draw
+     */
+    drawParticle(particle: Particle) {
+      this.ctx.globalAlpha = 1 - particle.getTransparency() / 100;
+      this.ctx.fillStyle = particle.getColor();
+      if (particle.getIsEclipse()) {
+        this.ctx.beginPath();
+        this.ctx.ellipse(
+          particle.getX() - getCamera().getX(),
+          particle.getY() - getCamera().getY(),
+          particle.getWidth() / 2,
+          particle.getHeight() / 2,
+          0,
+          0,
+          2 * Math.PI
+        );
+        this.ctx.fill();
+      }
+      else {
+        this.ctx.fillRect(
+          particle.getX() - getCamera().getX(),
+          particle.getY() - getCamera().getY(),
+          particle.getWidth(),
+          particle.getHeight()
+        );
       }
     }
 
@@ -981,6 +1017,8 @@ export namespace Neutron {
   export class Game {
     /** List of sprites in the game */
     private sprites: Sprite[];
+    /** List of particles in the game */
+    private particles: Particle[];
     /** The background image of the game */
     private background: HTMLImageElement | null;
     /** The map reader image of the game */
@@ -993,6 +1031,7 @@ export namespace Neutron {
      */
     constructor() {
       this.sprites = [];
+      this.particles = [];
       this.background = null;
       this.mapReaderImage = document.createElement(`img`);
       this.mapReaderCanvas = document.createElement(`canvas`);
@@ -1082,18 +1121,37 @@ export namespace Neutron {
     addNewSprite(sprites: Sprite | Sprite[]) {
       if (Array.isArray(sprites)) {
         sprites.forEach((sprite) => {
-          if (!getGame().getSprites().includes(sprite)) {
+          if (!this.sprites.includes(sprite)) {
             this.sprites.push(sprite);
           }
         });
       } else {
         const sprite = sprites as Sprite;
-        if (!getGame().getSprites().includes(sprite)) {
+        if (!this.sprites.includes(sprite)) {
           this.sprites.push(sprite);
         }
       }
 
       this.sprites = this.sortSprites(this.sprites);
+    }
+
+    /**
+     * Adds a new particle to the game.
+     * @param particle - The particle to add
+     */
+    addParticle(particle: Particle | Particle[]) {
+      if (Array.isArray(particle)) {
+        particle.forEach((p) => {
+          if (!this.particles.includes(p)) {
+            this.particles.push(p);
+          }
+        });
+      } else {
+        const p = particle as Particle;
+        if (!this.particles.includes(p)) {
+          this.particles.push(p);
+        }
+      }
     }
 
     /**
@@ -1103,6 +1161,14 @@ export namespace Neutron {
      */
     getSpriteById = (id: string) =>
       this.sprites.filter((sprite) => sprite.getId() === id)[0];
+
+    /**
+     * Gets a particle by its id.
+     * @param id - The id of the particle
+     * @returns The particle
+     */
+    getParticleById = (id: string) =>
+      this.particles.filter((particle) => particle.getId() === id)[0];
 
     /**
      * Gets sprites by type.
@@ -1119,11 +1185,34 @@ export namespace Neutron {
     }
 
     /**
+     * Gets particles by type.
+     * @param constructor - The constructor of the particle
+     * @returns The particles
+     */
+    getParticlesByType<T extends Particle>(
+      constructor: new (...args: any[]) => T
+    ): T[] {
+      const particles: Particle[] = this.particles;
+      return particles.filter(
+        (particle): particle is T => particle instanceof constructor
+      );
+    }
+
+    /**
      * Deletes a sprite by its id.
      * @param id - The id of the sprite
      */
     deleteSpriteById = (id: string) =>
       (this.sprites = this.sprites.filter((sprite) => sprite.getId() !== id));
+
+    /**
+     * Deletes a particle by its id.
+     * @param id - The id of the particle
+     */
+    deleteParticleById = (id: string) =>
+      (this.particles = this.particles.filter(
+        (particle) => particle.getId() !== id
+      ));
 
     /**
      * Deletes sprites by type.
@@ -1133,10 +1222,26 @@ export namespace Neutron {
       (this.sprites = this.sprites.filter((sprite) => sprite! instanceof type));
 
     /**
+     * Deletes particles by type.
+     * @param type - The type of the particle
+     */
+    deleteParticlesByType = (type: any) =>
+      (this.particles = this.particles.filter(
+        (particle) => particle! instanceof type
+      ));
+
+    /**
      * Deletes all sprites.
      */
     deleteSprites = () => {
       this.sprites.length = 0;
+    };
+
+    /**
+     * Deletes all particles.
+     */
+    deleteParticles = () => {
+      this.particles.length = 0;
     };
 
     /**
@@ -1192,6 +1297,14 @@ export namespace Neutron {
      */
     getSprites() {
       return this.sprites;
+    }
+
+    /**
+     * Gets the particles.
+     * @returns The particles
+     */
+    getParticles() {
+      return this.particles;
     }
   }
 
@@ -1862,6 +1975,275 @@ export namespace Neutron {
     }
   }
 
+  export class Particle {
+    /** The id of the particle. */
+    private id: string;
+    /** The x position of the particle. */
+    private x: number;
+    /** The y position of the particle. */
+    private y: number;
+    /** The width of the particle. */
+    private width: number;
+    /** The height of the particle. */
+    private height: number;
+    /** The color of the particle. */
+    private color: string;
+    /** The velocity of the particle on the x axis. */
+    private vx: number;
+    /** The velocity of the particle on the y axis. */
+    private vy: number;
+    /** The maximum velocity of the particle on the x axis. */
+    private maxVX: number | null;
+    /** The maximum velocity of the particle on the y axis. */
+    private maxVY: number | null;
+    /** The transparency of the particle. */
+    private transparency: number;
+    /** Whether the particle is an eclipse. */
+    private isEclipse: boolean;
+
+    /**
+     * Constructor for the Particle class.
+     * @param id - The id of the particle
+     * @param x - The x position of the particle
+     * @param y - The y position of the particle
+     * @param width - The width of the particle
+     * @param height - The height of the particle
+     * @param color - The color of the particle
+     */
+    constructor(
+      id: string,
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      color: string,
+    ) {
+      if (getGame().getParticleById(id)) {
+        throw new Error(`Particle with id ${id} already exists`);
+      }
+      this.id = id;
+      this.x = x;
+      this.y = y;
+      this.width = width;
+      this.height = height;
+      this.color = color;
+      this.vx = 0;
+      this.vy = 0;
+      this.maxVX = null;
+      this.maxVY = null;
+      this.transparency = 0;
+      this.isEclipse = false;
+    }
+
+    /**
+     * Updates the particle.
+     */
+    update() {
+      this.x += this.vx;
+      this.y += this.vy;
+
+      if (this.maxVX !== null) {
+        if (this.vx > this.maxVX) {
+          this.vx = this.maxVX;
+        } else if (this.vx < -this.maxVX) {
+          this.vx = -this.maxVX;
+        }
+      }
+
+      if (this.maxVY !== null) {
+        if (this.vy > this.maxVY) {
+          this.vy = this.maxVY;
+        } else if (this.vy < -this.maxVY) {
+          this.vy = -this.maxVY;
+        }
+      }
+    }
+
+    /**
+     * Gets the id of the particle.
+     * @returns The id of the particle
+     */
+    getId() {
+      return this.id;
+    }
+
+    /**
+     * Gets the x position of the particle.
+     * @returns The x position of the particle
+     */
+    getX() {
+      return this.x;
+    }
+
+    /**
+     * Sets the x position of the particle.
+     * @param x - The x position of the particle
+     */
+    setX(x: number) {
+      this.x = x;
+    }
+
+    /**
+     * Gets the y position of the particle.
+     * @returns The y position of the particle
+     */
+    getY() {
+      return this.y;
+    }
+
+    /**
+     * Sets the y position of the particle.
+     * @param y - The y position of the particle
+     */
+    setY(y: number) {
+      this.y = y;
+    }
+
+    /**
+     * Gets the width of the particle.
+     * @returns The width of the particle
+     */
+    getWidth() {
+      return this.width;
+    }
+
+    /**
+     * Sets the width of the particle.
+     * @param width - The width of the particle
+     */
+    setWidth(width: number) {
+      this.width = width;
+    }
+
+    /**
+     * Gets the height of the particle.
+     * @returns The height of the particle
+     */
+    getHeight() {
+      return this.height;
+    }
+
+    /**
+     * Sets the height of the particle.
+     * @param height - The height of the particle
+     */
+    setHeight(height: number) {
+      this.height = height;
+    }
+
+    /**
+     * Gets the color of the particle.
+     * @returns The color of the particle
+     */
+    getColor() {
+      return this.color;
+    }
+
+    /**
+     * Sets the color of the particle.
+     * @param color - The color of the particle
+     */
+    setColor(color: string) {
+      this.color = color;
+    }
+
+    /**
+     * Gets the velocity of the particle on the x axis.
+     * @returns The velocity of the particle on the x axis
+     */
+    getVX() {
+      return this.vx;
+    }
+
+    /**
+     * Sets the velocity of the particle on the x axis.
+     * @param vx - The velocity of the particle on the x axis
+     */
+    setVX(vx: number) {
+      this.vx = vx;
+    }
+
+    /**
+     * Gets the velocity of the particle on the y axis.
+     * @returns The velocity of the particle on the y axis
+     */
+    getVY() {
+      return this.vy;
+    }
+
+    /**
+     * Sets the velocity of the particle on the y axis.
+     * @param vy - The velocity of the particle on the y axis
+     */
+    setVY(vy: number) {
+      this.vy = vy;
+    }
+
+    /**
+     * Gets the maximum velocity of the particle on the x axis.
+     * @returns The maximum velocity of the particle on the x axis
+     */
+    getMaxVX() {
+      return this.maxVX;
+    }
+
+    /**
+     * Sets the maximum velocity of the particle on the x axis.
+     * @param maxVX - The maximum velocity of the particle on the x axis
+     */
+    setMaxVX(maxVX: number | null) {
+      this.maxVX = maxVX;
+    }
+
+    /**
+     * Gets the maximum velocity of the particle on the y axis.
+     * @returns The maximum velocity of the particle on the y axis
+     */
+    getMaxVY() {
+      return this.maxVY;
+    }
+
+    /**
+     * Sets the maximum velocity of the particle on the y axis.
+     * @param maxVY - The maximum velocity of the particle on the y axis
+     */
+    setMaxVY(maxVY: number | null) {
+      this.maxVY = maxVY;
+    }
+
+    /**
+     * Gets the transparency of the particle.
+     * @returns The transparency of the particle
+     */
+    getTransparency() {
+      return this.transparency;
+    }
+
+    /**
+     * Sets the transparency of the particle.
+     * @param transparency - The transparency of the particle
+     */
+    setTransparency(transparency: number) {
+      this.transparency = transparency;
+    }
+
+    /**
+     * Gets whether the particle is an eclipse.
+     * @returns Whether the particle is an eclipse
+     */
+    getIsEclipse() {
+      return this.isEclipse;
+    }
+
+    /**
+     * Sets whether the particle is an eclipse.
+     * @param isEclipse - Whether the particle is an eclipse
+     */
+    setIsEclipse(isEclipse: boolean) {
+      this.isEclipse = isEclipse;
+    }
+  }
+
   /** Platformer Sprite; Contains movement and collision features. */
   export class Platformer extends Sprite {
     /** The velocity of the sprite on the x axis. */
@@ -1922,7 +2304,8 @@ export namespace Neutron {
      */
     doGravity() {
       if (this.checkAllPlatformers) {
-        this.platformersToCheckCollision = getGame().getSpritesByType(Platformer);
+        this.platformersToCheckCollision =
+          getGame().getSpritesByType(Platformer);
       }
 
       this.hasPlatformerBelow = false;
@@ -1956,7 +2339,8 @@ export namespace Neutron {
      */
     moveX(x: number) {
       if (this.checkAllPlatformers) {
-        this.platformersToCheckCollision = getGame().getSpritesByType(Platformer);
+        this.platformersToCheckCollision =
+          getGame().getSpritesByType(Platformer);
       }
 
       this.setX(this.getX() + x);
@@ -1978,7 +2362,8 @@ export namespace Neutron {
      */
     moveY(y: number) {
       if (this.checkAllPlatformers) {
-        this.platformersToCheckCollision = getGame().getSpritesByType(Platformer);
+        this.platformersToCheckCollision =
+          getGame().getSpritesByType(Platformer);
       }
 
       this.setY(this.getY() + y);
