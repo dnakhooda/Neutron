@@ -56,6 +56,12 @@ export namespace Neutron {
     private minFrameTime: number;
     /** Accumulated time since last update */
     private accumulatedTime: number;
+    /** Maximum number of updates per frame */
+    private maxUpdatesPerFrame: number;
+    /** Whether to enable frame skipping for slow devices */
+    private enableFrameSkipping: boolean;
+    /** Number of frames to skip when behind */
+    private framesToSkip: number;
     /** Engine running state */
     private stopVal: boolean;
     /** Initialization state */
@@ -80,6 +86,9 @@ export namespace Neutron {
       this.lastUpdateTime = performance.now();
       this.minFrameTime = 1000 / this.idealTps;
       this.accumulatedTime = 0;
+      this.maxUpdatesPerFrame = 5;
+      this.enableFrameSkipping = true;
+      this.framesToSkip = 1;
       this.stopVal = false;
       this.hasInited = false;
       this.hasLoadedAssets = false;
@@ -175,13 +184,23 @@ export namespace Neutron {
       this.lastUpdateTime = currentTime;
       this.accumulatedTime += deltaTime;
 
-      while (this.accumulatedTime >= this.minFrameTime) {
+      let updates = 0;
+      while (
+        this.accumulatedTime >= this.minFrameTime &&
+        updates < this.maxUpdatesPerFrame
+      ) {
         this.update();
         this.tpsCounter++;
         this.accumulatedTime -= this.minFrameTime;
+        updates++;
       }
 
-      if (this.accumulatedTime > this.minFrameTime * 5) {
+      if (
+        this.enableFrameSkipping &&
+        this.accumulatedTime > this.minFrameTime * this.framesToSkip
+      ) {
+        this.accumulatedTime = 0;
+      } else if (this.accumulatedTime > this.minFrameTime * 5) {
         this.accumulatedTime = this.minFrameTime * 5;
       }
 
@@ -269,6 +288,10 @@ export namespace Neutron {
     private performanceInfoColor: string;
     /** The full screen ratio */
     private fullScreenRatio: [number, number] | null;
+    /** Reusable array for visible sprites */
+    private visibleSprites: Sprite[] = [];
+    /** Reusable array for visible particles */
+    private visibleParticles: Particle[] = [];
     /** The draw function */
     private draw: () => void;
 
@@ -316,8 +339,10 @@ export namespace Neutron {
       return () => {
         this.ctx.save();
 
-        const image = getGame().getBackgroundImage();
+        this.visibleSprites.length = 0;
+        this.visibleParticles.length = 0;
 
+        const image = getGame().getBackgroundImage();
         if (image === null) {
           this.ctx.fillStyle = `#000000`;
           this.ctx.fillRect(0, 0, this.getWidth(), this.getHeight());
@@ -328,52 +353,111 @@ export namespace Neutron {
         getGame()
           .getParticles()
           .forEach((particle) => {
-            this.drawParticle(particle);
+            if (
+              this.isVisible(
+                particle,
+                getCamera().getX(),
+                getCamera().getY(),
+                this.getWidth(),
+                this.getHeight()
+              )
+            ) {
+              this.visibleParticles.push(particle);
+            }
           });
 
         getGame()
           .getSprites()
-          .filter((obj: Sprite) => obj.isOnScreen())
-          .forEach((obj: Sprite) => {
-            this.drawSprite(obj);
-            obj.draw();
+          .forEach((sprite) => {
+            if (
+              this.isVisible(
+                sprite,
+                getCamera().getX(),
+                getCamera().getY(),
+                this.getWidth(),
+                this.getHeight()
+              )
+            ) {
+              this.visibleSprites.push(sprite);
+            }
           });
+
+        this.visibleParticles.forEach((particle) => {
+          this.drawParticle(particle);
+        });
+
+        this.visibleSprites.forEach((sprite) => {
+          this.drawSprite(sprite);
+          sprite.draw();
+        });
 
         this.draw();
 
         if (this.showPerformanceInfo) {
-          const performanceInfo = getEngine().getPerformanceInfo();
-          this.ctx.fillStyle = this.performanceInfoColor;
-          this.ctx.font = `${24 * this.scale}px serif`;
-          this.ctx.fillText(
-            `FPS: ${performanceInfo.fps}`,
-            20 * this.scale,
-            40 * this.scale
-          );
-          this.ctx.fillText(
-            `TPS: ${performanceInfo.tps}`,
-            20 * this.scale,
-            80 * this.scale
-          );
-          this.ctx.fillText(
-            `Ideal TPS: ${performanceInfo.idealTps}`,
-            20 * this.scale,
-            120 * this.scale
-          );
-          this.ctx.fillText(
-            `Min Frame Time: ${performanceInfo.minFrameTime}`,
-            20 * this.scale,
-            160 * this.scale
-          );
-          this.ctx.fillText(
-            `Accumulated Time: ${performanceInfo.accumulatedTime}`,
-            20 * this.scale,
-            200 * this.scale
-          );
+          this.drawPerformanceInfo();
         }
 
         this.ctx.restore();
       };
+    }
+
+    /**
+     * Checks if an object is visible on screen
+     * @param obj - The object to check
+     * @param cameraX - Camera X position
+     * @param cameraY - Camera Y position
+     * @param screenWidth - Screen width
+     * @param screenHeight - Screen height
+     * @returns Whether the object is visible
+     */
+    private isVisible(
+      obj: {
+        getX: () => number;
+        getY: () => number;
+        getWidth: () => number;
+        getHeight: () => number;
+      },
+      cameraX: number,
+      cameraY: number,
+      screenWidth: number,
+      screenHeight: number
+    ): boolean {
+      const x = obj.getX() - cameraX;
+      const y = obj.getY() - cameraY;
+      const width = obj.getWidth();
+      const height = obj.getHeight();
+
+      return (
+        x + width >= 0 &&
+        x <= screenWidth &&
+        y + height >= 0 &&
+        y <= screenHeight
+      );
+    }
+
+    /**
+     * Draws performance information on screen
+     */
+    private drawPerformanceInfo() {
+      const performanceInfo = getEngine().getPerformanceInfo();
+      this.ctx.fillStyle = this.performanceInfoColor;
+      this.ctx.font = `${24 * this.scale}px serif`;
+
+      const lines = [
+        `FPS: ${performanceInfo.fps}`,
+        `TPS: ${performanceInfo.tps}`,
+        `Ideal TPS: ${performanceInfo.idealTps}`,
+        `Min Frame Time: ${performanceInfo.minFrameTime}`,
+        `Accumulated Time: ${performanceInfo.accumulatedTime}`,
+      ];
+
+      lines.forEach((line, index) => {
+        this.ctx.fillText(
+          line,
+          20 * this.scale,
+          (40 + index * 40) * this.scale
+        );
+      });
     }
 
     /**
@@ -451,8 +535,7 @@ export namespace Neutron {
           2 * Math.PI
         );
         this.ctx.fill();
-      }
-      else {
+      } else {
         this.ctx.fillRect(
           particle.getX() - getCamera().getX(),
           particle.getY() - getCamera().getY(),
@@ -2016,7 +2099,7 @@ export namespace Neutron {
       y: number,
       width: number,
       height: number,
-      color: string,
+      color: string
     ) {
       if (getGame().getParticleById(id)) {
         throw new Error(`Particle with id ${id} already exists`);
