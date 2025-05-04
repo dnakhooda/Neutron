@@ -7,114 +7,195 @@
  * ╚═╝  ╚═══╝╚══════╝ ╚═════╝    ╚═╝   ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝
  */
 
-// Neutron Imports
-// Change Path to File Location When Needed
-
-import { Render as RenderExtension } from "../main/Render.ts";
-import { Game as GameExtension } from "../main/Game.ts";
-
-// Neutron
-
+/**
+ * Neutron namespace provides a game engine framework for creating interactive applications;
+ * includes core functionality for rendering, game state management, and event handling.
+ */
 export namespace Neutron {
+  /**
+   * Interface defining the settings and components required to initialize the game engine.
+   */
   interface EngineSettings {
-    update: () => void;
-    init: () => void;
-    load: () => void;
-
+    /** HTMLCanvasElement of the game */
+    canvas: HTMLCanvasElement;
+    /** Target ticks per second for the game loop */
     tps: number;
-
-    render: RenderExtension;
-    game: GameExtension;
-    controller: Controller;
-    loader: Loader;
+    /** Scale of the game canvas */
+    scale: number;
+    /** Events object */
     events: Events;
+
+    /** Function called every frame to draw the game */
+    draw: () => void;
+    /** Function called every tick to update game state */
+    update: () => void;
+    /** Function called once when the game is initialized */
+    init: () => void;
+    /** Function called to load game assets */
+    load: () => void;
   }
 
+  /**
+   * Manages the game loop, rendering, and game state updates; provides functionality for
+   * controlling frame rate, performance monitoring, and game state management.
+   */
   export class Engine {
-    private higherPreformanceUpdateLoop: boolean;
-
-    private idealTps: number;
-
-    private fpsCounter: number;
-    private tpsCounter: number;
-
+    /** Current frames per second */
     private fps: number;
+    /** Current ticks per second */
     private tps: number;
-
+    /** Counter for FPS calculation */
+    private fpsCounter: number;
+    /** Counter for TPS calculation */
+    private tpsCounter: number;
+    /** Target ticks per second for the game loop */
+    private idealTps: number;
+    /** Timestamp of the last update */
+    private lastUpdateTime: number;
+    /** Minimum time between updates in milliseconds */
+    private minFrameTime: number;
+    /** Accumulated time since last update */
+    private accumulatedTime: number;
+    /** Engine running state */
     private stopVal: boolean;
-
-    private hasInitialized: boolean;
-
+    /** Initialization state */
+    private hasInited: boolean;
+    /** Asset loading state */
     private hasLoadedAssets: boolean;
-
+    /** Game update function */
     private update: () => void;
+    /** Initialization function */
     private initFunc: () => void;
 
-    private lastUpdateTime: number;
-    private minFrameTime: number;
-
+    /**
+     * Creates a new instance of the Engine class.
+     * Initializes default values for performance monitoring and game loop settings.
+     */
     constructor() {
-      this.higherPreformanceUpdateLoop = false;
-
-      this.idealTps = 70;
-
-      this.fpsCounter = 0;
-      this.tpsCounter = 0;
-
       this.fps = 0;
       this.tps = 0;
-
+      this.fpsCounter = 0;
+      this.tpsCounter = 0;
+      this.idealTps = 70;
+      this.lastUpdateTime = performance.now();
+      this.minFrameTime = 1000 / this.idealTps;
+      this.accumulatedTime = 0;
       this.stopVal = false;
-
-      this.hasInitialized = false;
-
+      this.hasInited = false;
       this.hasLoadedAssets = false;
-
       this.update = () => {};
       this.initFunc = () => {};
-
-      this.lastUpdateTime = 0;
-      this.minFrameTime = 1000 / this.idealTps;
     }
 
-    private startRender = () => {
+    /**
+     * Initializes the game engine with the provided settings.
+     * Sets up the render loop, game state management, and event handling.
+     * @param engineSettings - Configuration object containing all necessary engine components
+     * and settings
+     */
+    init(engineSettings: EngineSettings): void {
+      const render = new Render(
+        engineSettings.canvas,
+        engineSettings.draw,
+        engineSettings.scale
+      );
+      const loader = new Loader();
+      const events = engineSettings.events;
+      const controller = new Controller(render, events);
+      const game = new Game();
+      const camera = new Camera();
+
+      getRender = () => render;
+      getLoader = () => loader;
+      getEvents = () => events;
+      getController = () => controller;
+      getGame = () => game;
+      getCamera = () => camera;
+
+      this.idealTps = engineSettings.tps;
+      this.minFrameTime = 1000 / this.idealTps;
+      this.initFunc = engineSettings.init;
+
+      this.update = () => {
+        getGame()
+          .getSprites()
+          .forEach((sprite: Sprite) => sprite.update());
+
+        const camera = getCamera();
+        if (camera.getToFollow() !== null) {
+          const toFollow = camera.getToFollow() as Sprite;
+          camera.setX(toFollow.getX() - getRender().getWidth() / 2);
+          camera.setY(toFollow.getY() - getRender().getHeight() / 2);
+        }
+
+        if (events.isMouseDown && events.mouseEvent) {
+          events.whileMouseDown(events.mouseEvent);
+        }
+
+        engineSettings.update();
+      };
+
+      engineSettings.load();
+
+      if (getLoader().getNumberOfAssetsToLoad() !== 0) {
+        this.hasLoadedAssets = true;
+      }
+
+      this.startLoop();
+      this.startPerformanceTracker();
+    }
+
+    /**
+     * Starts the main game loop.
+     * @private
+     */
+    private startLoop = (): void => {
       if (this.stopVal) {
-        window.requestAnimationFrame(this.startRender);
         return;
+      }
+
+      if (getLoader().getNumberOfAssetsToLoad() === 0) {
+        this.hasLoadedAssets = false;
       }
 
       if (this.hasLoadedAssets) {
-        if (getLoader().getNumberOfAssetsToLoad === 0) {
-          this.hasLoadedAssets = false;
-        }
-        window.requestAnimationFrame(this.startRender);
+        window.requestAnimationFrame(this.startLoop);
         return;
       }
 
-      if (!this.hasInitialized) {
+      if (!this.hasInited) {
         this.initFunc();
-        this.hasInitialized = true;
+        this.hasInited = true;
       }
 
       this.fpsCounter++;
 
       const currentTime = performance.now();
-      const timeSinceLastUpdate = currentTime - this.lastUpdateTime;
+      const deltaTime = currentTime - this.lastUpdateTime;
+      this.lastUpdateTime = currentTime;
+      this.accumulatedTime += deltaTime;
 
-      if (timeSinceLastUpdate >= this.minFrameTime) {
-        if (this.higherPreformanceUpdateLoop) {
-          this.update();
-          this.tpsCounter++;
-        }
-        this.lastUpdateTime = currentTime;
+      while (this.accumulatedTime >= this.minFrameTime) {
+        this.update();
+        this.tpsCounter++;
+        this.accumulatedTime -= this.minFrameTime;
       }
 
-      getRender().getDrawFunction();
+      if (this.accumulatedTime > this.minFrameTime * 5) {
+        this.accumulatedTime = this.minFrameTime * 5;
+      }
 
-      window.requestAnimationFrame(this.startRender);
+      (getRender().getDrawFunction())();
+
+      window.requestAnimationFrame(this.startLoop);
     };
 
-    private startCheckFPS = () => {
+    /**
+     * Starts the performance tracker to monitor frame rate and ticks per second;
+     * updates FPS and TPS counters every second.
+     * @private
+     */
+    private startPerformanceTracker = (): void => {
       setInterval(() => {
         this.fps = this.fpsCounter;
         this.tps = this.tpsCounter;
@@ -123,109 +204,100 @@ export namespace Neutron {
       }, 1000);
     };
 
-    init(EngineSettings: EngineSettings) {
-      getRender = () => {
-        return EngineSettings.render;
-      };
-      getGame = () => {
-        return EngineSettings.game;
-      };
-      getController = () => {
-        return EngineSettings.controller;
-      };
-      getLoader = () => {
-        return EngineSettings.loader;
-      };
+    /**
+     * Stops the game engine loop.
+     */
+    stop(): void {
+      this.stopVal = true;
+    }
 
-      this.update = () => {
-        EngineSettings.game.getSprites.forEach((sprite) => sprite.update());
-
-        const camera = EngineSettings.game.getCamera;
-        if (camera.getToFollow) {
-          camera.setX =
-            camera.getToFollow?.getMovement.getX - getRender().getWidth / 2;
-          camera.setY =
-            camera.getToFollow?.getMovement.getY - getRender().getHeight / 2;
-        }
-
-        if (
-          EngineSettings.events.isMouseDown &&
-          EngineSettings.events.mouseEvent
-        ) {
-          EngineSettings.events.whileMouseDown(
-            EngineSettings.events.mouseEvent
-          );
-        }
-
-        EngineSettings.update();
-      };
-
-      this.idealTps = EngineSettings.tps;
-
-      EngineSettings.load();
-
-      if (getLoader().getNumberOfAssetsToLoad !== 0) {
-        this.hasLoadedAssets = true;
+    /**
+     * Starts or resumes the game engine loop.
+     * Resets timing variables to ensure consistent behavior.
+     */
+    start(): void {
+      if (this.stopVal) {
+        this.stopVal = false;
+        this.lastUpdateTime = performance.now();
+        this.accumulatedTime = 0;
+        this.startLoop();
       }
-
-      this.initFunc = EngineSettings.init;
-
-      this.startRender();
-      this.startCheckFPS();
     }
 
-    set setHigherPreformanceUpdateLoop(val: boolean) {
-      this.higherPreformanceUpdateLoop = val;
-    }
-
-    get getFps() {
+    /**
+     * Gets the current frames per second.
+     * @returns The current FPS value
+     */
+    getFps(): number {
       return this.fps;
     }
-    get getTps() {
+
+    /**
+     * Gets the current ticks per second.
+     * @returns The current TPS value
+     */
+    getTps(): number {
       return this.tps;
     }
 
-    stop() {
-      this.stopVal = true;
-    }
-    start() {
-      this.stopVal = false;
+    /**
+     * Gets the performance info.
+     * @returns The performance info object
+     */
+    getPerformanceInfo() {
+      return {
+        fps: this.fps,
+        tps: this.tps,
+        idealTps: this.idealTps,
+        minFrameTime: this.minFrameTime,
+        accumulatedTime: this.accumulatedTime,
+      };
     }
   }
 
+  /** Handles the rendering of the game. */
   export class Render {
-    private showExtraInfo: boolean;
-
-    private extraInfoColor: string;
-
-    private dpr: number;
+    /** The Game Canvas Element */
     private canvas: HTMLCanvasElement;
+    /** The Scale of the Canvas */
+    private scale: number;
+    /** The Context of the Canvas */
     private ctx: CanvasRenderingContext2D;
-
-    private zoomVal: number;
+    /** Whether to show the performance info */
+    private showPerformanceInfo: boolean;
+    /** The color of the performance info */
+    private performanceInfoColor: string;
+    /** The full screen ratio */
     private fullScreenRatio: [number, number] | null;
-
+    /** The draw function */
     private draw: () => void;
 
-    constructor(canvas: HTMLCanvasElement, draw: () => void, dpr: number) {
-      this.showExtraInfo = false;
-      this.extraInfoColor = `#fff`;
-
+    /**
+     * Constructor for the Render class.
+     * @param canvas - The HTMLCanvasElement to render on
+     * @param draw - The function to draw on the canvas
+     * @param scale - The scale of the canvas
+     */
+    constructor(canvas: HTMLCanvasElement, draw: () => void, scale: number) {
       this.canvas = canvas;
-      this.dpr = dpr;
+      this.scale = scale;
       this.ctx = this.setupCanvas(canvas);
-
-      this.zoomVal = 1;
+      this.showPerformanceInfo = false;
+      this.performanceInfoColor = `#fff`;
       this.fullScreenRatio = null;
-
       this.draw = draw;
     }
 
+    /**
+     * Sets up the canvas for rendering.
+     * @param canvas - The HTMLCanvasElement to setup
+     * @returns The canvas context
+     */
     private setupCanvas(canvas: HTMLCanvasElement) {
       const rect = canvas.getBoundingClientRect();
 
-      canvas.width = rect.width * this.dpr;
-      canvas.height = rect.height * this.dpr;
+      canvas.width = rect.width * this.scale;
+      canvas.height = rect.height * this.scale;
 
       const ctx = canvas.getContext(`2d`);
 
@@ -236,450 +308,711 @@ export namespace Neutron {
       return ctx;
     }
 
+    /**
+     * Returns a function that draws the game on the canvas.
+     * @returns The draw function
+     */
     private drawFunction() {
       return () => {
-        const image = getGame().getBackgroundImage;
+        this.ctx.save();
 
-        this.getCtx.save();
+        const image = getGame().getBackgroundImage();
 
         if (image === null) {
-          this.getCtx.fillStyle = `#000`;
-          this.getCtx.fillRect(0, 0, this.getWidth, this.getHeight);
+          this.ctx.fillStyle = `#000000`;
+          this.ctx.fillRect(0, 0, this.getWidth(), this.getHeight());
         } else {
-          this.getCtx.drawImage(image, 0, 0, this.getWidth, this.getHeight);
+          this.ctx.drawImage(image, 0, 0, this.getWidth(), this.getHeight());
         }
 
-        getGame().getSprites.forEach((obj: Sprites.Sprite) => {
-          const costumeImage = obj.getCostumes.getCostume();
-
-          if (costumeImage === null) {
+        getGame()
+          .getSprites()
+          .filter((obj: Sprite) => obj.isOnScreen())
+          .forEach((obj: Sprite) => {
             this.drawSprite(obj);
-          } else {
-            this.drawSpriteImage(obj, costumeImage);
-          }
-
-          obj.draw();
-        });
+            obj.draw();
+          });
 
         this.draw();
 
-        if (this.showExtraInfo) {
-          this.getCtx.fillStyle = this.extraInfoColor;
-          this.getCtx.font = `${24 * this.dpr}px serif`;
-          this.getCtx.fillText(
-            `FPS: ${getEngine().getFps}`,
-            20 * this.dpr,
-            40 * this.dpr
+        if (this.showPerformanceInfo) {
+          const performanceInfo = getEngine().getPerformanceInfo();
+          this.ctx.fillStyle = this.performanceInfoColor;
+          this.ctx.font = `${24 * this.scale}px serif`;
+          this.ctx.fillText(
+            `FPS: ${performanceInfo.fps}`,
+            20 * this.scale,
+            40 * this.scale
           );
-          this.getCtx.fillText(
-            `TPS: ${getEngine().getTps}`,
-            20 * this.dpr,
-            80 * this.dpr
+          this.ctx.fillText(
+            `TPS: ${performanceInfo.tps}`,
+            20 * this.scale,
+            80 * this.scale
+          );
+          this.ctx.fillText(
+            `Ideal TPS: ${performanceInfo.idealTps}`,
+            20 * this.scale,
+            120 * this.scale
+          );
+          this.ctx.fillText(
+            `Min Frame Time: ${performanceInfo.minFrameTime}`,
+            20 * this.scale,
+            160 * this.scale
+          );
+          this.ctx.fillText(
+            `Accumulated Time: ${performanceInfo.accumulatedTime}`,
+            20 * this.scale,
+            200 * this.scale
           );
         }
 
-        this.getCtx.restore();
+        this.ctx.restore();
       };
     }
 
-    setCanvasZoom(zoom: number) {
-      let resetValue = this.getWidth / (this.getWidth * this.zoomVal);
-      this.getCtx.scale(resetValue, resetValue);
-      this.zoomVal = zoom / 100;
-      this.getCtx.scale(this.zoomVal, this.zoomVal);
-    }
-
-    makeCanvasMatchScreenWidth() {
-      this.getCanvas.style.width = `${window.innerWidth}px`;
-      this.getCanvas.style.height = `${window.innerHeight}px`;
-
-      this.getCanvas.width = window.innerWidth * this.dpr;
-      this.getCanvas.height = window.innerHeight * this.dpr;
-
-      this.getCanvas.style.position = "absolute";
-      this.getCanvas.style.left = "0";
-      this.getCanvas.style.top = "0";
-    }
-
-    makeCanvasCoverFullScreen(xRatio: number, yRatio: number) {
-      this.fullScreenRatio = [xRatio, yRatio];
-      if (window.innerHeight > window.innerWidth * (yRatio / xRatio)) {
-        this.getCanvas.style.width = `${window.innerWidth}px`;
-        this.getCanvas.style.height = `${
-          window.innerWidth * (yRatio / xRatio)
-        }px`;
-      } else {
-        this.getCanvas.style.width = `${
-          window.innerHeight * (xRatio / yRatio)
-        }px`;
-        this.getCanvas.style.height = `${window.innerHeight}px`;
-      }
-    }
-
-    drawSprite(object: Sprites.Sprite) {
-      if (!object.getEffect.getHidden) {
-        this.getCtx.globalAlpha = 1 - object.getEffect.getTransparency / 100;
-        this.getCtx.fillStyle = object.getColor;
-        this.getCtx.translate(
-          object.getMovement.getX +
-            object.getDimensions.getWidth / 2 -
-            getGame().getCamera.getX,
-          object.getMovement.getY +
-            object.getDimensions.getHeight / 2 -
-            getGame().getCamera.getY
+    /**
+     * Draws a sprite without an image on the canvas.
+     * @param object - The sprite to draw
+     */
+    drawSprite(object: Sprite) {
+      if (!object.getEffect().getHidden()) {
+        this.ctx.globalAlpha = 1 - object.getEffect().getTransparency() / 100;
+        this.ctx.fillStyle = object.getColor();
+        this.ctx.translate(
+          object.getX() + object.getWidth() / 2 - getCamera().getX(),
+          object.getY() + object.getHeight() / 2 - getCamera().getY()
         );
-        this.getCtx.rotate((object.getRotation * Math.PI) / 180);
-        this.getCtx.translate(
-          -(
-            object.getMovement.getX +
-            object.getDimensions.getWidth / 2 -
-            getGame().getCamera.getX
-          ),
-          -(
-            object.getMovement.getY +
-            object.getDimensions.getHeight / 2 -
-            getGame().getCamera.getY
-          )
+        this.ctx.rotate((object.getEffect().getRotation() * Math.PI) / 180);
+        this.ctx.translate(
+          -(object.getX() + object.getWidth() / 2 - getCamera().getX()),
+          -(object.getY() + object.getHeight() / 2 - getCamera().getY())
         );
-        if (object.getEclipse) {
+        if (object.getEffect().getIsEclipse()) {
           this.ctx.beginPath();
-          this.getCtx.ellipse(
-            object.getMovement.getX - getGame().getCamera.getX,
-            object.getMovement.getY - getGame().getCamera.getY,
-            object.getDimensions.getWidth / 2,
-            object.getDimensions.getHeight / 2,
+          this.ctx.ellipse(
+            object.getX() - getCamera().getX(),
+            object.getY() - getCamera().getY(),
+            object.getWidth() / 2,
+            object.getHeight() / 2,
             0,
             0,
             2 * Math.PI
           );
-          this.getCtx.fill();
-          this.getCtx.closePath();
+          this.ctx.fill();
+          this.ctx.closePath();
         } else {
-          this.getCtx.fillRect(
-            object.getMovement.getX - getGame().getCamera.getX,
-            object.getMovement.getY - getGame().getCamera.getY,
-            object.getDimensions.getWidth,
-            object.getDimensions.getHeight
-          );
+          if (object.getCostumes().getCostume() === null) {
+            this.ctx.fillStyle = object.getColor();
+            this.ctx.fillRect(
+              object.getX() - getCamera().getX(),
+              object.getY() - getCamera().getY(),
+              object.getWidth(),
+              object.getHeight()
+            );
+          } else {
+            const costume = object
+              .getCostumes()
+              .getCostume() as HTMLImageElement;
+            this.ctx.drawImage(
+              costume,
+              object.getX() - getCamera().getX(),
+              object.getY() - getCamera().getY(),
+              object.getWidth(),
+              object.getHeight()
+            );
+          }
+          this.ctx.setTransform(1, 0, 0, 1, 0, 0);
         }
-        this.getCtx.setTransform(1, 0, 0, 1, 0, 0);
       }
     }
 
-    drawSpriteImage(object: Sprites.Sprite, image: HTMLImageElement) {
-      if (!object.getEffect.getHidden) {
-        this.getCtx.globalAlpha = 1 - object.getEffect.getTransparency / 100;
-        this.getCtx.fillStyle = object.getColor;
-        this.getCtx.translate(
-          object.getMovement.getX +
-            object.getDimensions.getWidth / 2 -
-            getGame().getCamera.getX,
-          object.getMovement.getY +
-            object.getDimensions.getHeight / 2 -
-            getGame().getCamera.getY
-        );
-        this.getCtx.rotate((object.getRotation * Math.PI) / 180);
-        this.getCtx.translate(
-          -(
-            object.getMovement.getX +
-            object.getDimensions.getWidth / 2 -
-            getGame().getCamera.getX
-          ),
-          -(
-            object.getMovement.getY +
-            object.getDimensions.getHeight / 2 -
-            getGame().getCamera.getY
-          )
-        );
-        this.getCtx.drawImage(
-          image,
-          object.getMovement.getX - getGame().getCamera.getX,
-          object.getMovement.getY - getGame().getCamera.getY,
-          object.getDimensions.getWidth,
-          object.getDimensions.getHeight
-        );
-        this.getCtx.setTransform(1, 0, 0, 1, 0, 0);
+    /**
+     * Ajusts the canvas to the window size without a set ratio.
+     */
+    ajustCanvas() {
+      this.canvas.style.width = `${window.innerWidth}px`;
+      this.canvas.style.height = `${window.innerHeight}px`;
+
+      this.canvas.width = window.innerWidth * this.scale;
+      this.canvas.height = window.innerHeight * this.scale;
+
+      this.canvas.style.position = "absolute";
+      this.canvas.style.left = "0";
+      this.canvas.style.top = "0";
+    }
+
+    /**
+     * Ajusts the canvas to the window size with a set ratio.
+     * @param xRatio - The x ratio
+     * @param yRatio - The y ratio
+     */
+    ajustCanvasRatio(xRatio: number, yRatio: number) {
+      this.fullScreenRatio = [xRatio, yRatio];
+      if (window.innerHeight > window.innerWidth * (yRatio / xRatio)) {
+        this.canvas.style.width = `${window.innerWidth}px`;
+        this.canvas.style.height = `${window.innerWidth * (yRatio / xRatio)}px`;
+      } else {
+        this.canvas.style.width = `${window.innerHeight * (xRatio / yRatio)}px`;
+        this.canvas.style.height = `${window.innerHeight}px`;
       }
     }
 
-    drawSpriteWithInputs(
-      x: number,
-      y: number,
-      width: number,
-      height: number,
-      color: string
-    ) {
-      this.getCtx.fillStyle = color;
-      this.getCtx.fillRect(x, y, width, height);
-    }
-
-    set setExtraInfoColor(_val: string) {
-      this.extraInfoColor = _val;
-    }
-
-    get getDrawFunction() {
+    /**
+     * Gets the draw function.
+     * @returns The draw function
+     */
+    getDrawFunction() {
       return this.drawFunction().bind(this);
     }
 
-    get getCanvas() {
+    /**
+     * Gets the performance info color.
+     * @returns The performance info color
+     */
+    getPerformanceInfoColor() {
+      return this.performanceInfoColor;
+    }
+
+    /**
+     * Sets the performance info color.
+     * @param _val - The color
+     */
+    setPerformanceInfoColor(_val: string) {
+      this.performanceInfoColor = _val;
+    }
+
+    /**
+     * Gets the canvas.
+     * @returns The canvas
+     */
+    getCanvas() {
       return this.canvas;
     }
 
-    get getWidth() {
-      return this.canvas.width / (this.getCanvasZoom / 100);
-    }
-    get getHeight() {
-      return this.canvas.height / (this.getCanvasZoom / 100);
-    }
-
-    get getShowExtraInfo() {
-      return this.showExtraInfo;
-    }
-    set setShowExtraInfo(_val: boolean) {
-      this.showExtraInfo = _val;
+    /**
+     * Gets the width of the canvas.
+     * @returns The width of the canvas
+     */
+    getWidth() {
+      return this.canvas.width;
     }
 
-    get getCtx() {
+    /**
+     * Gets the height of the canvas.
+     * @returns The height of the canvas
+     */
+    getHeight() {
+      return this.canvas.height;
+    }
+
+    /**
+     * Gets the show performance info.
+     * @returns The show performance info
+     */
+    isShowingPerformanceInfo() {
+      return this.showPerformanceInfo;
+    }
+
+    /**
+     * Sets the show performance info.
+     * @param _val - The show performance info
+     */
+    setShowPerformanceInfo(_val: boolean) {
+      this.showPerformanceInfo = _val;
+    }
+
+    /**
+     * Gets the context of the canvas.
+     * @returns The context of the canvas
+     */
+    getCtx(): CanvasRenderingContext2D {
       return this.ctx;
     }
-    get getDpr() {
-      return this.dpr;
+
+    /**
+     * Gets the scale of the canvas.
+     * @returns The scale of the canvas
+     */
+    getScale(): number {
+      return this.scale;
     }
-    get getFullScreenRatios() {
+
+    /**
+     * Gets the full screen ratios.
+     * @returns The full screen ratios
+     */
+    getFullScreenRatios(): [number, number] | null {
       return this.fullScreenRatio;
     }
-    get getCanvasZoom() {
-      return this.zoomVal * 100;
-    }
   }
 
-  export class Controller {
-    private keysDown: { [key: string]: boolean };
-
-    private clientX: number | null;
-    private clientY: number | null;
-
-    private mouseX: number | null;
-    private mouseY: number | null;
-
-    private eventObject: Events;
-
-    constructor(render: Render, events: Events) {
-      this.keysDown = {};
-
-      this.clientX = null;
-      this.clientY = null;
-
-      this.mouseX = null;
-      this.mouseY = null;
-
-      this.eventObject = events;
-
-      document.onkeydown = (e) => {
-        this.keysDown[e.key] = true;
-
-        switch (e.key) {
-          case `F2`:
-            render.setShowExtraInfo = !render.getShowExtraInfo;
-            break;
-        }
-
-        this.eventObject.onClick(e);
-      };
-
-      document.onkeyup = (e) => {
-        this.keysDown[e.key] = false;
-        this.eventObject.offClick(e);
-      };
-
-      document.addEventListener(`visibilitychange`, () => {
-        if (document.visibilityState !== `visible`) {
-          for (let key in this.keysDown) this.keysDown[key] = false;
-        }
-      });
-
-      render.getCanvas.addEventListener(`mousedown`, (e) => {
-        this.eventObject.isMouseDown = true;
-        this.eventObject.mouseEvent = e;
-        this.eventObject.mouseDown(e);
-      });
-
-      render.getCanvas.addEventListener(`mouseup`, (e) => {
-        this.eventObject.isMouseDown = false;
-        this.eventObject.mouseEvent = null;
-        this.eventObject.mouseUp(e);
-      });
-
-      render.getCanvas.addEventListener(`mousemove`, (e) => {
-        const camera = getGame().getCamera;
-
-        const x =
-          (e.clientX - Neutron.getRender().getCanvas.offsetLeft) *
-            (Neutron.getRender().getWidth /
-              Neutron.getRender().getCanvas.getBoundingClientRect().width) +
-          camera.getX;
-        const y =
-          (e.clientY - Neutron.getRender().getCanvas.offsetTop) *
-            (Neutron.getRender().getHeight /
-              Neutron.getRender().getCanvas.getBoundingClientRect().height) +
-          camera.getY;
-
-        this.clientX = e.clientX;
-        this.clientY = e.clientY;
-
-        this.setMouseX = x;
-        this.setMouseY = y;
-
-        this.eventObject.mouseMove(e);
-        this.eventObject.mouseEvent = e;
-      });
-
-      render.getCanvas.addEventListener("touchstart", (e) => {
-        e.preventDefault();
-        const touch = e.touches[0];
-        const mouseEvent = new MouseEvent("mousedown", {
-          clientX: touch.clientX,
-          clientY: touch.clientY,
-        });
-        this.eventObject.isMouseDown = true;
-        this.eventObject.mouseEvent = mouseEvent;
-        this.eventObject.mouseDown(mouseEvent);
-      });
-
-      render.getCanvas.addEventListener("touchend", (e) => {
-        e.preventDefault();
-        const mouseEvent = new MouseEvent("mouseup", {});
-        this.eventObject.isMouseDown = false;
-        this.eventObject.mouseEvent = null;
-        this.eventObject.mouseUp(mouseEvent);
-      });
-
-      render.getCanvas.addEventListener("touchmove", (e) => {
-        e.preventDefault();
-        const touch = e.touches[0];
-        const camera = getGame().getCamera;
-
-        const x =
-          (touch.clientX - getRender().getCanvas.offsetLeft) *
-            (getRender().getWidth /
-              getRender().getCanvas.getBoundingClientRect().width) +
-          camera.getX;
-        const y =
-          (touch.clientY - getRender().getCanvas.offsetTop) *
-            (getRender().getHeight /
-              getRender().getCanvas.getBoundingClientRect().height) +
-          camera.getY;
-
-        this.clientX = touch.clientX;
-        this.clientY = touch.clientY;
-
-        this.setMouseX = x;
-        this.setMouseY = y;
-
-        const mouseEvent = new MouseEvent("mousemove", {
-          clientX: touch.clientX,
-          clientY: touch.clientY,
-        });
-        this.eventObject.mouseMove(mouseEvent);
-        this.eventObject.mouseEvent = mouseEvent;
-      });
-    }
-
-    getKey(key: string) {
-      if (this.keysDown[key] === undefined) return false;
-      return this.keysDown[key];
-    }
-
-    get getMouseX() {
-      if (!this.clientX) {
-        return null;
-      }
-
-      this.mouseX =
-        ((this.clientX || 0) - getRender().getCanvas.offsetLeft) *
-          (getRender().getWidth /
-            getRender().getCanvas.getBoundingClientRect().width) +
-        getGame().getCamera.getX;
-      return this.mouseX;
-    }
-    private set setMouseX(_val: number) {
-      this.mouseX = _val;
-    }
-
-    get getMouseY() {
-      if (!this.clientY) {
-        return null;
-      }
-
-      this.mouseY =
-        ((this.clientY || 0) - getRender().getCanvas.offsetTop) *
-          (getRender().getHeight /
-            getRender().getCanvas.getBoundingClientRect().height) +
-        getGame().getCamera.getY;
-      return this.mouseY;
-    }
-    private set setMouseY(_val: number) {
-      this.mouseY = _val;
-    }
-
-    get getIsMouseDown() {
-      return this.eventObject.isMouseDown;
-    }
-  }
-
+  /** Handles the loading of game assets. */
   export class Loader {
-    private images: [string, HTMLImageElement][] = [];
-    private assetsToLoad = 0;
+    /** All image assets to load */
+    private images: [string, HTMLImageElement][];
+    /** All audio assets to load */
+    private audio: [string, HTMLAudioElement][];
+    /** The number of assets to load */
+    private assetsToLoad: number;
 
+    /**
+     * Constructor for the Loader class.
+     */
+    constructor() {
+      this.images = [];
+      this.audio = [];
+      this.assetsToLoad = 0;
+    }
+
+    /**
+     * Loads an image.
+     * @param id - The id of the image
+     * @param src - The source of the image
+     */
     loadImage(id: string, src: string) {
+      this.assetsToLoad++;
       let image = new Image();
       image.src = src;
       this.images.push([id, image]);
       image.onload = () => this.assetsToLoad--;
-      this.assetsToLoad++;
     }
 
+    /**
+     * Loads an audio.
+     * @param id - The id of the audio
+     * @param src - The source of the audio
+     */
+    loadAudio(id: string, src: string) {
+      this.assetsToLoad++;
+      let audio = new Audio(src);
+      this.audio.push([id, audio]);
+      audio.onload = () => this.assetsToLoad--;
+    }
+
+    /**
+     * Gets the loaded image by id.
+     * @param id - The id of the image
+     * @returns The loaded image
+     */
     getLoadedImageById = (id: string) =>
       this.images.filter((image) => image[0] === id)[0][1];
 
-    get getNumberOfAssetsToLoad() {
+    /**
+     * Gets the loaded audio by id.
+     * @param id - The id of the audio
+     * @returns The loaded audio
+     */
+    getLoadedAudioById = (id: string) =>
+      this.audio.filter((audio) => audio[0] === id)[0][1];
+
+    /**
+     * Gets the number of assets to load.
+     * @returns The number of assets to load
+     */
+    getNumberOfAssetsToLoad() {
       return this.assetsToLoad;
     }
   }
 
+  /** Handles the events of the game. */
+  export interface Events {
+    /** The mouse event */
+    mouseEvent: MouseEvent | null;
+    /** The touch event */
+    touchEvent: TouchEvent | null;
+    /** Whether the mouse is down */
+    isMouseDown: boolean;
+    /** Whether the touch is down */
+    isTouchDown: boolean;
+
+    /** Handles the click event */
+    onClick(e: KeyboardEvent): void;
+    /** Handles the off click event */
+    offClick(e: KeyboardEvent): void;
+
+    /** Handles the mouse down event */
+    mouseDown(e: MouseEvent): void;
+    /** Handles the mouse up event */
+    mouseUp(e: MouseEvent): void;
+    /** Handles the mouse move event */
+    mouseMove(e: MouseEvent): void;
+
+    /** Handles the touch start event */
+    touchStart(e: TouchEvent): void;
+    /** Handles the touch end event */
+    touchEnd(e: TouchEvent): void;
+    /** Handles the touch move event */
+    touchMove(e: TouchEvent): void;
+
+    /** Handles the while mouse down event */
+    whileMouseDown(e: MouseEvent): void;
+    /** Handles the while touch down event */
+    whileTouchDown(e: TouchEvent): void;
+  }
+
+  /** Handles game controls. */
+  export class Controller {
+    /** Dictionary of currently pressed keys */
+    private keysDown: { [key: string]: boolean };
+    /** Unajusted mouse X coordinate */
+    private mouseClientX: number | null;
+    /** Unajusted mouse Y coordinate */
+    private mouseClientY: number | null;
+    /** Unajusted touch X coordinate */
+    private touchClientX: number | null;
+    /** Unajusted touch Y coordinate */
+    private touchClientY: number | null;
+    /** Mouse X coordinate */
+    private mouseX: number | null;
+    /** Mouse Y coordinate */
+    private mouseY: number | null;
+    /** Touch X coordinate */
+    private touchX: number | null;
+    /** Touch Y coordinate */
+    private touchY: number | null;
+    /** Event object */
+    private eventObj: Events;
+
+    /**
+     * Constructor for the Controller class.
+     * @param render - The render object
+     * @param events - The events object
+     */
+    constructor(render: Render, events: Events) {
+      this.keysDown = {};
+      this.mouseClientX = null;
+      this.mouseClientY = null;
+      this.touchClientX = null;
+      this.touchClientY = null;
+      this.mouseX = null;
+      this.mouseY = null;
+      this.touchX = null;
+      this.touchY = null;
+      this.eventObj = events;
+
+      document.onkeydown = (e: KeyboardEvent) => {
+        e.preventDefault();
+        this.keysDown[e.key] = true;
+
+        switch (e.key) {
+          case `F2`:
+            render.setShowPerformanceInfo(!render.isShowingPerformanceInfo());
+            break;
+        }
+
+        this.eventObj.onClick(e);
+      };
+
+      document.onkeyup = (e: KeyboardEvent) => {
+        e.preventDefault();
+        this.keysDown[e.key] = false;
+        this.eventObj.offClick(e);
+      };
+
+      render.getCanvas().addEventListener(`mousedown`, (e) => {
+        e.preventDefault();
+        const camera = getCamera();
+
+        const x =
+          (e.clientX - Neutron.getRender().getCanvas().offsetLeft) *
+            (Neutron.getRender().getWidth() /
+              Neutron.getRender().getCanvas().getBoundingClientRect().width) +
+          camera.getX();
+
+        const y =
+          (e.clientY - Neutron.getRender().getCanvas().offsetTop) *
+            (Neutron.getRender().getHeight() /
+              Neutron.getRender().getCanvas().getBoundingClientRect().height) +
+          camera.getY();
+
+        this.mouseClientX = e.clientX;
+        this.mouseClientY = e.clientY;
+
+        this.mouseX = x;
+        this.mouseY = y;
+
+        this.eventObj.isMouseDown = true;
+        this.eventObj.mouseEvent = e;
+        this.eventObj.mouseDown(e);
+      });
+
+      render.getCanvas().addEventListener(`mouseup`, (e) => {
+        e.preventDefault();
+        const camera = getCamera();
+
+        const x =
+          (e.clientX - Neutron.getRender().getCanvas().offsetLeft) *
+            (Neutron.getRender().getWidth() /
+              Neutron.getRender().getCanvas().getBoundingClientRect().width) +
+          camera.getX();
+
+        const y =
+          (e.clientY - Neutron.getRender().getCanvas().offsetTop) *
+            (Neutron.getRender().getHeight() /
+              Neutron.getRender().getCanvas().getBoundingClientRect().height) +
+          camera.getY();
+
+        this.mouseClientX = e.clientX;
+        this.mouseClientY = e.clientY;
+
+        this.mouseX = x;
+        this.mouseY = y;
+
+        this.eventObj.isMouseDown = false;
+        this.eventObj.mouseEvent = e;
+        this.eventObj.mouseUp(e);
+      });
+
+      render.getCanvas().addEventListener(`mousemove`, (e) => {
+        e.preventDefault();
+        const camera = getCamera();
+
+        const x =
+          (e.clientX - Neutron.getRender().getCanvas().offsetLeft) *
+            (Neutron.getRender().getWidth() /
+              Neutron.getRender().getCanvas().getBoundingClientRect().width) +
+          camera.getX();
+
+        const y =
+          (e.clientY - Neutron.getRender().getCanvas().offsetTop) *
+            (Neutron.getRender().getHeight() /
+              Neutron.getRender().getCanvas().getBoundingClientRect().height) +
+          camera.getY();
+
+        this.mouseClientX = e.clientX;
+        this.mouseClientY = e.clientY;
+
+        this.mouseX = x;
+        this.mouseY = y;
+
+        this.eventObj.mouseMove(e);
+        this.eventObj.mouseEvent = e;
+      });
+
+      render.getCanvas().addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const camera = getCamera();
+
+        const x =
+          (touch.clientX - Neutron.getRender().getCanvas().offsetLeft) *
+            (Neutron.getRender().getWidth() /
+              Neutron.getRender().getCanvas().getBoundingClientRect().width) +
+          camera.getX();
+
+        const y =
+          (touch.clientY - Neutron.getRender().getCanvas().offsetTop) *
+            (Neutron.getRender().getHeight() /
+              Neutron.getRender().getCanvas().getBoundingClientRect().height) +
+          camera.getY();
+
+        this.touchClientX = touch.clientX;
+        this.touchClientY = touch.clientY;
+
+        this.touchX = x;
+        this.touchY = y;
+
+        this.eventObj.touchStart(e);
+        this.eventObj.touchEvent = e;
+      });
+
+      render.getCanvas().addEventListener("touchend", (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const camera = getCamera();
+
+        const x =
+          (touch.clientX - getRender().getCanvas().offsetLeft) *
+            (getRender().getWidth() /
+              getRender().getCanvas().getBoundingClientRect().width) +
+          camera.getX();
+        const y =
+          (touch.clientY - getRender().getCanvas().offsetTop) *
+            (getRender().getHeight() /
+              getRender().getCanvas().getBoundingClientRect().height) +
+          camera.getY();
+
+        this.touchClientX = touch.clientX;
+        this.touchClientY = touch.clientY;
+
+        this.touchX = x;
+        this.touchY = y;
+
+        this.eventObj.touchEnd(e);
+        this.eventObj.touchEvent = e;
+      });
+
+      render.getCanvas().addEventListener("touchmove", (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const camera = getCamera();
+
+        const x =
+          (touch.clientX - getRender().getCanvas().offsetLeft) *
+            (getRender().getWidth() /
+              getRender().getCanvas().getBoundingClientRect().width) +
+          camera.getX();
+        const y =
+          (touch.clientY - getRender().getCanvas().offsetTop) *
+            (getRender().getHeight() /
+              getRender().getCanvas().getBoundingClientRect().height) +
+          camera.getY();
+
+        this.touchClientX = touch.clientX;
+        this.touchClientY = touch.clientY;
+
+        this.touchX = x;
+        this.touchY = y;
+
+        this.eventObj.touchMove(e);
+        this.eventObj.touchEvent = e;
+      });
+
+      document.addEventListener(`visibilitychange`, () => {
+        if (document.visibilityState !== `visible`) {
+          for (let key in this.keysDown) {
+            this.keysDown[key] = false;
+          }
+          this.eventObj.isMouseDown = false;
+          this.eventObj.isTouchDown = false;
+        }
+      });
+    }
+
+    /**
+     * Gets the key state.
+     * @param key - The key to get the state of
+     * @returns The key state
+     */
+    getKey(key: string) {
+      return this.keysDown[key] === undefined ? false : this.keysDown[key];
+    }
+
+    /**
+     * Gets the mouse X coordinate.
+     * @returns The mouse X coordinate
+     */
+    getMouseX() {
+      if (!this.mouseClientX) {
+        return null;
+      }
+
+      this.mouseX =
+        ((this.mouseClientX || 0) - getRender().getCanvas().offsetLeft) *
+          (getRender().getWidth() /
+            getRender().getCanvas().getBoundingClientRect().width) +
+        getCamera().getX();
+
+      return this.mouseX;
+    }
+
+    /**
+     * Gets the mouse Y coordinate.
+     * @returns The mouse Y coordinate
+     */
+    getMouseY() {
+      if (!this.mouseClientY) {
+        return null;
+      }
+
+      this.mouseY =
+        ((this.mouseClientY || 0) - getRender().getCanvas().offsetTop) *
+          (getRender().getHeight() /
+            getRender().getCanvas().getBoundingClientRect().height) +
+        getCamera().getY();
+
+      return this.mouseY;
+    }
+
+    /**
+     * Gets the touch X coordinate.
+     * @returns The touch X coordinate
+     */
+    getTouchX() {
+      if (!this.touchClientX) {
+        return null;
+      }
+
+      this.touchX =
+        ((this.touchClientX || 0) - getRender().getCanvas().offsetLeft) *
+          (getRender().getWidth() /
+            getRender().getCanvas().getBoundingClientRect().width) +
+        getCamera().getX();
+
+      return this.touchX;
+    }
+
+    /**
+     * Gets the touch Y coordinate.
+     * @returns The touch Y coordinate
+     */
+    getTouchY() {
+      if (!this.touchClientY) {
+        return null;
+      }
+
+      this.touchY =
+        ((this.touchClientY || 0) - getRender().getCanvas().offsetTop) *
+          (getRender().getHeight() /
+            getRender().getCanvas().getBoundingClientRect().height) +
+        getCamera().getY();
+
+      return this.touchY;
+    }
+
+    /**
+     * Gets the mouse down state.
+     * @returns The mouse down state
+     */
+    getIsMouseDown() {
+      return this.eventObj.isMouseDown;
+    }
+
+    /**
+     * Gets the touch down state.
+     * @returns The touch down state
+     */
+    getIsTouchDown() {
+      return this.eventObj.isTouchDown;
+    }
+  }
+
+  /** Handles the game state. */
   export class Game {
-    private sprites: Sprites.Sprite[] = [];
+    /** List of sprites in the game */
+    private sprites: Sprite[];
+    /** The background image of the game */
+    private background: HTMLImageElement | null;
+    /** The map reader image of the game */
+    private mapReaderImage: HTMLImageElement;
+    /** The map reader canvas of the game */
+    private mapReaderCanvas: HTMLCanvasElement;
 
-    private background: HTMLImageElement | null = null;
+    /**
+     * Constructor for the Game class.
+     */
+    constructor() {
+      this.sprites = [];
+      this.background = null;
+      this.mapReaderImage = document.createElement(`img`);
+      this.mapReaderCanvas = document.createElement(`canvas`);
+    }
 
-    private camera = new Camera();
-
-    private mapReaderImage = document.createElement(`img`);
-    private mapReaderCanvas = document.createElement(`canvas`);
-
-    private sortSprites(arr: Sprites.Sprite[]) {
-      arr.sort((a, b) => a.getStageLevel - b.getStageLevel);
+    /**
+     * Sorts the sprites by stage level.
+     * @param arr - The array of sprites to sort
+     * @returns The sorted array of sprites
+     */
+    private sortSprites(arr: Sprite[]) {
+      arr.sort((a, b) => a.getStageLevel() - b.getStageLevel());
       return arr;
     }
 
-    private loadCanvas() {
-      this.mapReaderCanvas.width = this.mapReaderImage.width;
-      this.mapReaderCanvas.height = this.mapReaderImage.height;
-
-      const ctx = this.mapReaderCanvas.getContext(`2d`);
-
-      if (ctx === null) throw new Error(`Image map canvas ctx null!`);
-
-      ctx.drawImage(
-        this.mapReaderImage,
-        0,
-        0,
-        this.mapReaderImage.width,
-        this.mapReaderImage.height
-      );
-    }
-
-    private doImageMap(
+    /**
+     * Creates a map from an image.
+     * @param func - The function to call for each pixel
+     */
+    private createMapFromImage(
       func: (data: Uint8ClampedArray, x: number, y: number) => void
     ) {
       for (let h = 0; h < this.mapReaderCanvas.height; h++) {
@@ -695,68 +1028,125 @@ export namespace Neutron {
       }
     }
 
-    useImageMap(
+    /**
+     * Uses an image to create a map.
+     * @param image - The image to create the map from
+     * @param func - The function to call for each pixel
+     */
+    useImageToCreateMap(
       image: HTMLImageElement,
       func: (data: Uint8ClampedArray, x: number, y: number) => void
     ) {
       this.mapReaderImage = image;
 
-      this.loadCanvas();
+      this.mapReaderCanvas.width = this.mapReaderImage.width;
+      this.mapReaderCanvas.height = this.mapReaderImage.height;
 
-      this.doImageMap(func);
+      const ctx = this.mapReaderCanvas.getContext(`2d`);
+
+      if (ctx === null) throw new Error(`Image map canvas ctx null!`);
+
+      ctx.drawImage(
+        this.mapReaderImage,
+        0,
+        0,
+        this.mapReaderImage.width,
+        this.mapReaderImage.height
+      );
+
+      this.createMapFromImage(func);
 
       getEngine().start();
     }
 
-    getLocationOnImageMap(x: number, y: number) {
+    /**
+     * Gets the image data at a location.
+     * @param x - The x coordinate
+     * @param y - The y coordinate
+     * @returns The image data
+     */
+    getMapImageDataAtLocation(x: number, y: number) {
       const ctx = this.mapReaderCanvas.getContext(`2d`);
 
       if (ctx === null) {
         throw new Error(`Image map context is null!`);
       }
 
-      ctx.getImageData(x, y, 1, 1);
+      return ctx.getImageData(x, y, 1, 1);
     }
 
-    addNewSprite(sprites: Sprites.Sprite | Sprites.Sprite[]) {
+    /**
+     * Adds a new sprite to the game.
+     * @param sprites - The sprite to add
+     */
+    addNewSprite(sprites: Sprite | Sprite[]) {
       if (Array.isArray(sprites)) {
-        this.sprites.concat(sprites);
+        sprites.forEach((sprite) => {
+          if (!getGame().getSprites().includes(sprite)) {
+            this.sprites.push(sprite);
+          }
+        });
       } else {
-        this.sprites.push(sprites);
+        const sprite = sprites as Sprite;
+        if (!getGame().getSprites().includes(sprite)) {
+          this.sprites.push(sprite);
+        }
       }
 
       this.sprites = this.sortSprites(this.sprites);
     }
 
+    /**
+     * Gets a sprite by its id.
+     * @param id - The id of the sprite
+     * @returns The sprite
+     */
     getSpriteById = (id: string) =>
-      this.sprites.filter((sprite) => sprite.getId === id)[0];
+      this.sprites.filter((sprite) => sprite.getId() === id)[0];
 
-    getSpritesByType<T extends Sprites.Sprite>(
+    /**
+     * Gets sprites by type.
+     * @param constructor - The constructor of the sprite
+     * @returns The sprites
+     */
+    getSpritesByType<T extends Sprite>(
       constructor: new (...args: any[]) => T
     ): T[] {
-      const sprites: Sprites.Sprite[] = this.sprites;
+      const sprites: Sprite[] = this.sprites;
       return sprites.filter(
         (sprite): sprite is T => sprite instanceof constructor
       );
     }
 
-    getPlatformerSprites(): Sprites.Platformer[] {
-      const sprites: any[] = this.sprites;
-      return sprites.filter((sprite) => sprite instanceof Sprites.Platformer);
-    }
+    /**
+     * Deletes a sprite by its id.
+     * @param id - The id of the sprite
+     */
+    deleteSpriteById = (id: string) =>
+      (this.sprites = this.sprites.filter((sprite) => sprite.getId() !== id));
 
-    deleteSpriteById = (id: string) => {
-      this.sprites = this.sprites.filter((sprite) => sprite.getId !== id);
-    };
+    /**
+     * Deletes sprites by type.
+     * @param type - The type of the sprite
+     */
+    deleteSpritesByType = (type: any) =>
+      (this.sprites = this.sprites.filter((sprite) => sprite! instanceof type));
 
-    deleteSpritesByType = (type: any) => {
-      this.sprites = this.sprites.filter((sprite) => sprite! instanceof type);
-    };
-
+    /**
+     * Deletes all sprites.
+     */
     deleteSprites = () => {
       this.sprites.length = 0;
     };
 
+    /**
+     * Sets a dynamic background image.
+     * @param image - The image to set
+     * @param x - The x coordinate
+     * @param y - The y coordinate
+     * @param width - The width of the image
+     * @param height - The height of the image
+     */
     setDynamicBackgroundImage(
       image: HTMLImageElement,
       x: number,
@@ -764,7 +1154,7 @@ export namespace Neutron {
       width: number,
       height: number
     ) {
-      const background = new Sprites.Sprite(
+      const background = new Sprite(
         `background`,
         x,
         y,
@@ -774,699 +1164,1058 @@ export namespace Neutron {
         0
       );
 
-      background.getCostumes.addCostume(`set`, image);
-      background.getCostumes.setCostumeById(`set`);
+      background.getCostumes().addCostume(`set`, image);
+      background.getCostumes().setCostumeById(`set`);
 
       this.addNewSprite(background);
     }
 
+    /**
+     * Sets a static background image.
+     * @param image - The image to set
+     */
     setStaticBackgroundImage = (image: HTMLImageElement) => {
       this.background = image;
     };
 
-    get getBackgroundImage() {
+    /**
+     * Gets the background image.
+     * @returns The background image
+     */
+    getBackgroundImage() {
       return this.background;
     }
 
-    get getCamera() {
-      return this.camera;
-    }
-
-    get getSprites() {
+    /**
+     * Gets the sprites.
+     * @returns The sprites
+     */
+    getSprites() {
       return this.sprites;
     }
   }
 
-  export class Events {
-    isMouseDown: boolean;
-    mouseEvent: MouseEvent | null;
-
-    constructor() {
-      this.isMouseDown = false;
-      this.mouseEvent = null;
-    }
-
-    onClick(_e: KeyboardEvent) {}
-    offClick(_e: KeyboardEvent) {}
-
-    mouseDown(_e: MouseEvent) {}
-    mouseUp(_e: MouseEvent) {}
-
-    mouseMove(_e: MouseEvent) {}
-
-    whileMouseDown(_e: MouseEvent) {}
-
-    get getIsMouseDown() {
-      return this.isMouseDown;
-    }
-  }
-
+  /** Handles the camera. */
   class Camera {
+    /** The x coordinate */
     private x: number;
+    /** The y coordinate */
     private y: number;
+    /** The sprite to follow */
+    private toFollow: Sprite | null;
 
-    private toFollow: Sprites.Sprite | null;
-
+    /**
+     * Constructor for the Camera class.
+     */
     constructor() {
       this.x = 0;
       this.y = 0;
       this.toFollow = null;
     }
 
-    set setToFollow(_val: Sprites.Sprite | null) {
+    /**
+     * Sets the sprite to follow.
+     * @param _val - The sprite to follow
+     */
+    setToFollow(_val: Sprite | null) {
       this.toFollow = _val;
     }
 
-    get getToFollow() {
+    /**
+     * Gets the sprite to follow.
+     * @returns The sprite to follow
+     */
+    getToFollow() {
       return this.toFollow;
     }
 
+    /**
+     * Goes to a location.
+     * @param _valx - The x coordinate
+     * @param _valy - The y coordinate
+     */
     goTo(_valx: number, _valy: number) {
-      this.setX = _valx;
-      this.setY = _valy;
+      this.setX(_valx);
+      this.setY(_valy);
     }
 
-    get getX() {
+    /**
+     * Gets the x coordinate.
+     * @returns The x coordinate
+     */
+    getX() {
       return this.x;
     }
-    set setX(_val: number) {
+
+    /**
+     * Sets the x coordinate.
+     * @param _val - The x coordinate
+     */
+    setX(_val: number) {
       this.x = Number(_val.toFixed(1));
     }
 
-    get getY() {
+    /**
+     * Gets the y coordinate.
+     * @returns The y coordinate
+     */
+    getY() {
       return this.y;
     }
-    set setY(_val: number) {
+
+    /**
+     * Sets the y coordinate.
+     * @param _val - The y coordinate
+     */
+    setY(_val: number) {
       this.y = Number(_val.toFixed(1));
     }
 
-    get getWidth() {
+    /**
+     * Gets the width.
+     * @returns The width
+     */
+    getWidth() {
       return getRender().getWidth;
     }
-    get getHeight() {
+
+    /**
+     * Gets the height.
+     * @returns The height
+     */
+    getHeight() {
       return getRender().getHeight;
     }
   }
 
-  export namespace Sprites {
-    namespace SpriteObjects {
-      export class Costumes {
-        private costumes: { [id: string]: HTMLImageElement | null } = {
-          NONE: null,
-        };
+  /** Handles the sprite. */
+  export class Sprite {
+    /** The id */
+    private id: string;
+    /** The x coordinate */
+    private x: number;
+    /** The y coordinate */
+    private y: number;
+    /** The width */
+    private width: number;
+    /** The height */
+    private height: number;
+    /** The color */
+    private color: string;
+    /** The stage level */
+    private stageLevel: number;
+    /** The costumes */
+    private costumes = new Costumes();
+    /** The effects */
+    private effects = new Effects();
+    /** The collision */
+    private collision = new Collision(this);
 
-        private id = `NONE`;
-
-        addCostume(id: string, image: HTMLImageElement | null) {
-          if (id.toUpperCase() === `NONE`)
-            throw new Error(`Cannot Set Costume None!`);
-          this.costumes[id] = image;
-        }
-
-        setCostumeById(id: string) {
-          if (id.toUpperCase() === `NONE`) this.id = `NONE`;
-          else this.id = id;
-        }
-
-        getCostume = () => this.costumes[this.id];
+    /**
+     * Constructor for the Sprite class.
+     * @param id - The id
+     * @param x - The x coordinate
+     * @param y - The y coordinate
+     * @param width - The width
+     * @param height - The height
+     * @param color - The color
+     * @param stageLevel - The stage level
+     */
+    constructor(
+      id: string,
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      color: string,
+      stageLevel: number
+    ) {
+      if (getGame().getSpriteById(id)) {
+        throw new Error(`Sprite ${id} already exists!`);
       }
 
-      export class Sounds {
-        private sounds: { [id: string]: HTMLAudioElement } = {};
+      this.id = id;
+      this.x = x;
+      this.y = y;
+      this.width = width;
+      this.height = height;
+      this.color = color;
+      this.stageLevel = stageLevel;
+    }
 
-        addSound(id: string, src: string) {
-          let audio = new Audio(src);
-          audio.preload = `auto`;
-          this.sounds[id] = audio;
-        }
+    /**
+     * Checks if the sprite is on screen.
+     * @returns Whether the sprite is on screen
+     */
+    isOnScreen() {
+      return (
+        this.x + this.width >= getCamera().getX() &&
+        this.x <= getCamera().getX() + getRender().getWidth() &&
+        this.y + this.height >= getCamera().getY() &&
+        this.y <= getCamera().getY() + getRender().getHeight()
+      );
+    }
 
-        stopSoundById(id: string) {
-          this.sounds[id].pause();
-          this.sounds[id].currentTime = 0;
-        }
+    /**
+     * Goes to a location.
+     * @param _valx - The x coordinate
+     * @param _valy - The y coordinate
+     */
+    goTo(_valx: number, _valy: number) {
+      this.x = _valx;
+      this.y = _valy;
+    }
 
-        pauseSoundById(id: string) {
-          this.sounds[id].pause();
-        }
-
-        playSoundById(id: string) {
-          this.sounds[id].play();
-        }
-
-        setSoundVolumeById(id: string, volume: number) {
-          this.sounds[id].volume = volume / 100;
-        }
-      }
-
-      export class Movement {
-        private me: Sprite;
-
-        private x = 0;
-        private y = 0;
-
-        constructor(me: Sprite) {
-          this.me = me;
-        }
-
-        goTo(_valx: number, _valy: number) {
-          this.x = _valx;
-          this.y = _valy;
-        }
-
-        to(place: Enums.ScreenPlaces) {
-          switch (place) {
-            case Enums.ScreenPlaces.center:
-              this.goTo(
-                getRender().getWidth / 2 - this.me.getDimensions.getWidth / 2,
-                getRender().getHeight / 2 - this.me.getDimensions.getHeight / 2
-              );
-              break;
-            case Enums.ScreenPlaces.verticalCenter:
-              this.goTo(
-                this.getX,
-                getRender().getHeight / 2 - this.me.getDimensions.getHeight / 2
-              );
-              break;
-            case Enums.ScreenPlaces.horizontalCenter:
-              this.goTo(
-                getRender().getWidth / 2 - this.me.getDimensions.getWidth / 2,
-                this.getY
-              );
-              break;
-            case Enums.ScreenPlaces.randomPosition:
-              this.goTo(
-                Math.floor(Math.random() * getRender().getWidth),
-                Math.floor(Math.random() * getRender().getHeight)
-              );
-              break;
-          }
-        }
-
-        get getX() {
-          return this.x;
-        }
-        set setX(_val: number) {
-          this.x = _val;
-          this.x = Number(this.x.toFixed(1));
-        }
-
-        get getY() {
-          return this.y;
-        }
-        set setY(_val: number) {
-          this.y = _val;
-          this.y = Number(this.y.toFixed(1));
-        }
-      }
-
-      export class Dimensions {
-        private width: number = 0;
-        private height: number = 0;
-
-        get getWidth() {
-          return this.width;
-        }
-        set setWidth(_val: number) {
-          this.width = _val;
-          this.width = Number(this.width.toFixed(1));
-        }
-
-        get getHeight() {
-          return this.height;
-        }
-        set setHeight(_val: number) {
-          this.height = _val;
-          this.height = Number(this.height.toFixed(1));
-        }
-      }
-
-      export class Effects {
-        private hidden: boolean;
-        private transparency: number;
-
-        constructor(hidden: boolean, transparency: number) {
-          this.hidden = hidden;
-          this.transparency = transparency;
-        }
-
-        clearEffects() {
-          this.hidden = false;
-          this.transparency = 0;
-        }
-
-        get getHidden() {
-          return this.hidden;
-        }
-        set setHidden(_val: boolean) {
-          this.hidden = _val;
-        }
-
-        get getTransparency() {
-          return this.transparency;
-        }
-        set setTransparency(_val: number) {
-          this.transparency = _val;
-        }
-      }
-
-      export class Collision {
-        private me: Sprite;
-
-        constructor(me: Sprite) {
-          this.me = me;
-        }
-
-        touchingSprite = () =>
-          getGame().getSprites.filter(
-            (sprite) => this.touching(sprite) && sprite !== this.me
+    /**
+     * Goes to a location.
+     * @param place - The place
+     */
+    to(place: ScreenPlaces) {
+      switch (place) {
+        case ScreenPlaces.center:
+          this.goTo(
+            getRender().getWidth() / 2 - this.getWidth() / 2,
+            getRender().getHeight() / 2 - this.getHeight() / 2
           );
-
-        touching(other: Sprite) {
-          if (
-            this.me.getMovement.getX <
-              other.getMovement.getX + other.getDimensions.getWidth &&
-            this.me.getMovement.getX + this.me.getDimensions.getWidth >
-              other.getMovement.getX &&
-            this.me.getMovement.getY <
-              other.getMovement.getY + other.getDimensions.getHeight &&
-            this.me.getMovement.getY + this.me.getDimensions.getHeight >
-              other.getMovement.getY
-          )
-            return true;
-          return false;
-        }
-
-        getSpriteAboveSelf() {
-          this.me.getMovement.setY = this.me.getMovement.getY - 1;
-          const touchingSprites = getGame().getSprites.filter(
-            (sprite) =>
-              this.me.getCollision.touching(sprite) && this.me !== sprite
+          break;
+        case ScreenPlaces.verticalCenter:
+          this.goTo(
+            this.getX(),
+            getRender().getHeight() / 2 - this.getHeight() / 2
           );
-          this.me.getMovement.setY = this.me.getMovement.getY + 1;
-          return touchingSprites;
-        }
-
-        getSpriteBelowSelf() {
-          this.me.getMovement.setY = this.me.getMovement.getY + 1;
-          const touchingSprites = getGame().getSprites.filter(
-            (sprite) =>
-              this.me.getCollision.touching(sprite) && this.me !== sprite
+          break;
+        case ScreenPlaces.horizontalCenter:
+          this.goTo(
+            getRender().getWidth() / 2 - this.getWidth() / 2,
+            this.getY()
           );
-          this.me.getMovement.setY = this.me.getMovement.getY - 1;
-          return touchingSprites;
-        }
-
-        getSpriteLeftSelf() {
-          this.me.getMovement.setX = this.me.getMovement.getX - 1;
-          const touchingSprites = getGame().getSprites.filter(
-            (sprite) =>
-              this.me.getCollision.touching(sprite) && this.me !== sprite
+          break;
+        case ScreenPlaces.randomPosition:
+          this.goTo(
+            Math.floor(Math.random() * getRender().getWidth()),
+            Math.floor(Math.random() * getRender().getHeight())
           );
-          this.me.getMovement.setX = this.me.getMovement.getX + 1;
-          return touchingSprites;
-        }
-
-        getSpriteRightSelf() {
-          this.me.getMovement.setX = this.me.getMovement.getX + 1;
-          const touchingSprites = getGame().getSprites.filter(
-            (sprite) =>
-              this.me.getCollision.touching(sprite) && this.me !== sprite
-          );
-          this.me.getMovement.setX = this.me.getMovement.getX - 1;
-          return touchingSprites;
-        }
+          break;
       }
     }
 
-    export class Sprite {
-      private color: string;
+    /**
+     * Updates the sprite.
+     */
+    update() {}
 
-      private id: string;
+    /**
+     * Draws the sprite.
+     */
+    draw() {}
 
-      private stageLevel: number;
-
-      private rotation = 0;
-
-      private movement = new SpriteObjects.Movement(this);
-
-      private dimensions = new SpriteObjects.Dimensions();
-
-      private costumes = new SpriteObjects.Costumes();
-
-      private sounds = new SpriteObjects.Sounds();
-
-      private effects = new SpriteObjects.Effects(false, 0);
-
-      private collision = new SpriteObjects.Collision(this);
-
-      private eclipse = false;
-
-      constructor(
-        id: string,
-        x: number,
-        y: number,
-        width: number,
-        height: number,
-        color: string,
-        stageLevel: number
-      ) {
-        this.getMovement.setX = x;
-        this.getMovement.setY = y;
-
-        this.dimensions.setWidth = width;
-        this.dimensions.setHeight = height;
-
-        this.color = color;
-
-        this.stageLevel = stageLevel;
-
-        this.id = id;
-      }
-
-      update() {}
-
-      draw() {}
-
-      isOnScreen() {
-        if (
-          this.movement.getX + this.dimensions.getWidth >=
-            getGame().getCamera.getX &&
-          this.movement.getX <=
-            getGame().getCamera.getX + getRender().getWidth &&
-          this.movement.getY + this.dimensions.getHeight >=
-            getGame().getCamera.getY &&
-          this.movement.getY <= getGame().getCamera.getY + getRender().getHeight
-        )
-          return true;
-        return false;
-      }
-
-      get getColor() {
-        return this.color;
-      }
-      set setColor(_val: string) {
-        this.color = _val;
-      }
-
-      get getStageLevel() {
-        return this.stageLevel;
-      }
-      set setStageLevel(_val: number) {
-        this.stageLevel = _val;
-      }
-
-      get getRotation() {
-        return this.rotation;
-      }
-      set setRotation(_val: number) {
-        this.rotation = _val;
-      }
-
-      get getId() {
-        return this.id;
-      }
-
-      get getMovement() {
-        return this.movement;
-      }
-
-      get getDimensions() {
-        return this.dimensions;
-      }
-
-      get getEffect() {
-        return this.effects;
-      }
-
-      get getCollision() {
-        return this.collision;
-      }
-
-      get getCostumes() {
-        return this.costumes;
-      }
-
-      get getSounds() {
-        return this.sounds;
-      }
-
-      get getEclipse() {
-        return this.eclipse;
-      }
-
-      set setEclipse(_val: boolean) {
-        this.eclipse = _val;
-      }
+    /**
+     * Gets the id.
+     * @returns The id
+     */
+    getId() {
+      return this.id;
     }
 
-    export class Platformer extends Sprite {
-      private vx = 0;
-      private vxSpeed = 0.5;
-      private maxVX: number | null = null;
-
-      private vy = 0;
-      private vySpeed = 0.5;
-      private maxVY: number | null = null;
-
-      private gravityAcc = 0.2;
-
-      private hasPlatformerBelow = false;
-
-      private checkAllCollision = true;
-
-      private platformersToCheckCollision = getGame().getPlatformerSprites();
-
-      constructor(
-        id: string,
-        x: number,
-        y: number,
-        width: number,
-        height: number,
-        color: string,
-        stageLevel: number
-      ) {
-        super(id, x, y, width, height, color, stageLevel);
+    /**
+     * Sets the id.
+     * @param _val - The id
+     */
+    setId(_val: string) {
+      if (getGame().getSpriteById(_val)) {
+        throw new Error(`Sprite ${_val} already exists!`);
       }
 
-      doGravity() {
-        this.hasPlatformerBelow = false;
+      this.id = _val;
+    }
 
-        this.getMovement.setY = this.getMovement.getY + this.getVY;
+    /**
+     * Gets the x coordinate.
+     * @returns The x coordinate
+     */
+    getX() {
+      return this.x;
+    }
 
-        if (this.checkAllCollision)
-          this.platformersToCheckCollision = getGame().getPlatformerSprites();
+    /**
+     * Sets the x coordinate.
+     * @param _val - The x coordinate
+     */
+    setX(_val: number) {
+      this.x = _val;
+    }
 
-        this.platformersToCheckCollision.forEach((platformer) => {
-          if (this.getCollision.touching(platformer) && this !== platformer) {
-            if (this.getVY < 0)
-              this.getMovement.setY =
-                platformer.getMovement.getY +
-                platformer.getDimensions.getHeight;
-            else {
-              this.getMovement.setY =
-                platformer.getMovement.getY - this.getDimensions.getHeight;
+    /**
+     * Gets the y coordinate.
+     * @returns The y coordinate
+     */
+    getY() {
+      return this.y;
+    }
 
-              this.hasPlatformerBelow = true;
-            }
+    /**
+     * Sets the y coordinate.
+     * @param _val - The y coordinate
+     */
+    setY(_val: number) {
+      this.y = _val;
+    }
 
-            if (this.getCollision.touching(platformer))
-              this.getMovement.setY = this.getMovement.getY + 0.1;
+    /**
+     * Gets the width.
+     * @returns The width
+     */
+    getWidth() {
+      return this.width;
+    }
 
-            this.setVY = 0;
-          }
-        });
+    /**
+     * Sets the width.
+     * @param _val - The width
+     */
+    setWidth(_val: number) {
+      this.width = _val;
+    }
 
-        if (!this.hasPlatformerBelow)
-          this.setVY = this.getVY + this.getGravityAcc;
-        else this.setVY = 0;
-      }
+    /**
+     * Gets the height.
+     * @returns The height
+     */
+    getHeight() {
+      return this.height;
+    }
 
-      moveX(x: number) {
-        this.getMovement.setX = this.getMovement.getX + x;
+    /**
+     * Sets the height.
+     * @param _val - The height
+     */
+    setHeight(_val: number) {
+      this.height = _val;
+    }
 
-        if (this.checkAllCollision)
-          this.platformersToCheckCollision = getGame().getPlatformerSprites();
+    /**
+     * Gets the color.
+     * @returns The color
+     */
+    getColor() {
+      return this.color;
+    }
 
-        const touchingPlatformers = this.platformersToCheckCollision.filter(
-          (platformer) =>
-            this.getCollision.touching(platformer) && this !== platformer
-        );
+    /**
+     * Sets the color.
+     * @param _val - The color
+     */
+    setColor(_val: string) {
+      this.color = _val;
+    }
 
-        touchingPlatformers.forEach((platformer) => {
-          if (x > 0)
-            this.getMovement.setX =
-              platformer.getMovement.getX - this.getDimensions.getWidth;
-          else
-            this.getMovement.setX =
-              platformer.getMovement.getX + platformer.getDimensions.getWidth;
-        });
-      }
+    /**
+     * Gets the stage level.
+     * @returns The stage level
+     */
+    getStageLevel() {
+      return this.stageLevel;
+    }
 
-      moveY(y: number) {
-        this.getMovement.setY = this.getMovement.getY + y;
+    /**
+     * Sets the stage level.
+     * @param _val - The stage level
+     */
+    setStageLevel(_val: number) {
+      this.stageLevel = _val;
+    }
 
-        if (this.checkAllCollision)
-          this.platformersToCheckCollision = getGame().getPlatformerSprites();
+    /**
+     * Gets the effects.
+     * @returns The effects
+     */
+    getEffect() {
+      return this.effects;
+    }
 
-        const touchingPlatformers = this.platformersToCheckCollision.filter(
-          (platformer) =>
-            this.getCollision.touching(platformer) && this !== platformer
-        );
+    /**
+     * Gets the collision.
+     * @returns The collision
+     */
+    getCollision() {
+      return this.collision;
+    }
 
-        touchingPlatformers.forEach((platformer) => {
-          if (y > 0)
-            this.getMovement.setY =
-              platformer.getMovement.getY - this.getDimensions.getHeight;
-          else
-            this.getMovement.setY =
-              platformer.getMovement.getY + platformer.getDimensions.getHeight;
-        });
-      }
-
-      doJump(jumpHeight: number) {
-        if (this.getPlatformerBelowSelf().length > 0) this.setVY = -jumpHeight;
-      }
-
-      getPlatformerAboveSelf() {
-        this.getMovement.setY = this.getMovement.getY - 1;
-        const touchingPlatformers = getGame()
-          .getPlatformerSprites()
-          .filter(
-            (sprite) => this.getCollision.touching(sprite) && this !== sprite
-          );
-        this.getMovement.setY = this.getMovement.getY + 1;
-        return touchingPlatformers;
-      }
-
-      getPlatformerBelowSelf() {
-        this.getMovement.setY = this.getMovement.getY + 1;
-        const touchingPlatformers = getGame()
-          .getPlatformerSprites()
-          .filter(
-            (sprite) => this.getCollision.touching(sprite) && this !== sprite
-          );
-        this.getMovement.setY = this.getMovement.getY - 1;
-        return touchingPlatformers;
-      }
-
-      getPlatformerLeftSelf() {
-        this.getMovement.setX = this.getMovement.getX - 1;
-        const touchingPlatformers = getGame()
-          .getPlatformerSprites()
-          .filter(
-            (sprite) => this.getCollision.touching(sprite) && this !== sprite
-          );
-        this.getMovement.setX = this.getMovement.getX + 1;
-        return touchingPlatformers;
-      }
-
-      getPlatformerRightSelf() {
-        this.getMovement.setX = this.getMovement.getX + 1;
-        const touchingPlatformers = getGame()
-          .getPlatformerSprites()
-          .filter(
-            (sprite) => this.getCollision.touching(sprite) && this !== sprite
-          );
-        this.getMovement.setX = this.getMovement.getX - 1;
-        return touchingPlatformers;
-      }
-
-      addFrictionX(friction: number) {
-        this.setVX = this.vx * friction;
-        if (Math.abs(this.getVX) < 0.3) this.setVX = 0;
-      }
-
-      addFrictionY(friction: number) {
-        this.setVY = this.vy * friction;
-        if (Math.abs(this.getVY) < 0.3) this.setVY = 0;
-      }
-
-      get getVX() {
-        return this.vx;
-      }
-      set setVX(_val: number) {
-        this.vx = _val;
-        this.vx = Number(this.vx.toFixed(1));
-        if (this.maxVX !== null && this.vx > this.maxVX) this.vx = this.maxVX;
-        else if (this.maxVX !== null && this.vx < -this.maxVX)
-          this.vx = -this.maxVX;
-      }
-
-      get getVXSpeed() {
-        return this.vxSpeed;
-      }
-      set setVXSpeed(_val: number) {
-        this.vxSpeed = _val;
-        this.vxSpeed = Number(this.vxSpeed.toFixed(1));
-      }
-
-      get getMaxVX() {
-        return this.maxVX;
-      }
-      set setMaxVX(_val: number | null) {
-        this.maxVX = _val;
-      }
-
-      get getVY() {
-        return this.vy;
-      }
-      set setVY(_val: number) {
-        this.vy = _val;
-        this.vy = Number(this.vy.toFixed(1));
-        if (this.maxVY !== null && this.vy > this.maxVY) this.vy = this.maxVY;
-        else if (this.maxVY !== null && this.vy < -this.maxVY)
-          this.vy = -this.maxVY;
-      }
-
-      get getVYSpeed() {
-        return this.vySpeed;
-      }
-      set setVYSpeed(_val: number) {
-        this.vySpeed = _val;
-        this.vySpeed = Number(this.vySpeed.toFixed(1));
-      }
-
-      get getMaxVY() {
-        return this.maxVY;
-      }
-      set setMaxVY(_val: number | null) {
-        this.maxVY = _val;
-      }
-
-      get getGravityAcc() {
-        return this.gravityAcc;
-      }
-      set setGravityAcc(_val: number) {
-        this.gravityAcc = _val;
-      }
-
-      get getPlatformersToCheckCollision() {
-        return this.platformersToCheckCollision;
-      }
-
-      set setPlatformerSpritesToCheckCollisionWith(_val: Platformer[]) {
-        this.platformersToCheckCollision = _val;
-
-        if (_val !== getGame().getPlatformerSprites())
-          this.checkAllCollision = false;
-      }
+    /**
+     * Gets the costumes.
+     * @returns The costumes
+     */
+    getCostumes() {
+      return this.costumes;
     }
   }
 
-  export namespace Enums {
-    export enum ScreenPlaces {
-      center,
-      verticalCenter,
-      horizontalCenter,
-      randomPosition,
+  /** Handles the effects of the sprite. */
+  class Effects {
+    /** Whether the sprite is hidden */
+    private hidden: boolean;
+    /** The transparency */
+    private transparency: number;
+    /** The rotation */
+    private rotation: number;
+    /** Whether the sprite is an eclipse */
+    private isEclipse: boolean;
+    /** The eclipse rotation */
+    private eclipseRotation: number;
+    /** The eclipse start angle */
+    private eclipseStartAngle: number;
+    /** The eclipse end angle */
+    private eclipseEndAngle: number;
+
+    /**
+     * Constructor for the Effects class.
+     */
+    constructor() {
+      this.hidden = false;
+      this.transparency = 0;
+      this.rotation = 0;
+      this.isEclipse = false;
+      this.eclipseRotation = 0;
+      this.eclipseStartAngle = 0;
+      this.eclipseEndAngle = 2 * Math.PI;
     }
+
+    /**
+     * Clears the effects.
+     */
+    clearEffects() {
+      this.hidden = false;
+      this.transparency = 0;
+      this.rotation = 0;
+      this.isEclipse = false;
+      this.eclipseRotation = 0;
+      this.eclipseStartAngle = 0;
+      this.eclipseEndAngle = 2 * Math.PI;
+    }
+
+    /**
+     * Gets whether the sprite is hidden.
+     * @returns Whether the sprite is hidden
+     */
+    getHidden() {
+      return this.hidden;
+    }
+
+    /**
+     * Sets whether the sprite is hidden.
+     * @param _val - Whether the sprite is hidden
+     */
+    setHidden(_val: boolean) {
+      this.hidden = _val;
+    }
+
+    /**
+     * Gets the transparency.
+     * @returns The transparency
+     */
+    getTransparency() {
+      return this.transparency;
+    }
+
+    /**
+     * Sets the transparency.
+     * @param _val - The transparency
+     */
+    setTransparency(_val: number) {
+      this.transparency = _val;
+    }
+
+    /**
+     * Gets the rotation.
+     * @returns The rotation
+     */
+    getRotation() {
+      return this.rotation;
+    }
+
+    /**
+     * Sets the rotation.
+     * @param _val - The rotation
+     */
+    setRotation(_val: number) {
+      this.rotation = _val;
+    }
+
+    /**
+     * Gets whether the sprite is an eclipse.
+     * @returns Whether the sprite is an eclipse
+     */
+    getIsEclipse() {
+      return this.isEclipse;
+    }
+
+    /**
+     * Sets whether the sprite is an eclipse.
+     * @param _val - Whether the sprite is an eclipse
+     */
+    setIsEclipse(_val: boolean) {
+      this.isEclipse = _val;
+    }
+
+    /**
+     * Gets the eclipse rotation.
+     * @returns The eclipse rotation
+     */
+    getEclipseRotation() {
+      return this.eclipseRotation;
+    }
+
+    /**
+     * Sets the eclipse rotation.
+     * @param _val - The eclipse rotation
+     */
+    setEclipseRotation(_val: number) {
+      this.eclipseRotation = _val;
+    }
+
+    /**
+     * Gets the eclipse start angle.
+     * @returns The eclipse start angle
+     */
+    getEclipseStartAngle() {
+      return this.eclipseStartAngle;
+    }
+
+    /**
+     * Sets the eclipse start angle.
+     * @param _val - The eclipse start angle
+     */
+    setEclipseStartAngle(_val: number) {
+      this.eclipseStartAngle = _val;
+    }
+
+    /**
+     * Gets the eclipse end angle.
+     * @returns The eclipse end angle
+     */
+    getEclipseEndAngle() {
+      return this.eclipseEndAngle;
+    }
+
+    /**
+     * Sets the eclipse end angle.
+     * @param _val - The eclipse end angle
+     */
+    setEclipseEndAngle(_val: number) {
+      this.eclipseEndAngle = _val;
+    }
+  }
+
+  /** Handles the costumes of the sprite. */
+  class Costumes {
+    /** The costumes */
+    private costumes: { [id: string]: HTMLImageElement | null } = {
+      NONE: null,
+    };
+    /** The current costume */
+    private id = `NONE`;
+
+    /**
+     * Constructor for the Costumes class.
+     */
+    constructor() {
+      this.costumes = {
+        NONE: null,
+      };
+      this.id = `NONE`;
+    }
+
+    /**
+     * Adds a costume.
+     * @param id - The id
+     * @param image - The image
+     */
+    addCostume(id: string, image: HTMLImageElement | null) {
+      if (id.toUpperCase() === `NONE`) {
+        throw new Error(`Cannot add Costume as Id 'None'!`);
+      }
+
+      this.costumes[id] = image;
+    }
+
+    /**
+     * Sets the costume by id.
+     * @param id - The id
+     */
+    setCostumeById(id: string) {
+      if (id.toUpperCase() === `NONE`) {
+        this.id = `NONE`;
+      } else {
+        this.id = id;
+      }
+    }
+
+    /**
+     * Gets the costume.
+     * @returns The costume
+     */
+    getCostume() {
+      return this.costumes[this.id];
+    }
+  }
+
+  /** Handles the collision of the sprite. */
+  class Collision {
+    /** Self sprite */
+    private me: Sprite;
+
+    /**
+     * Constructor for the Collision class.
+     * @param me - Self sprite
+     */
+    constructor(me: Sprite) {
+      this.me = me;
+    }
+
+    /**
+     * Gets all sprites touching the self sprite.
+     * @returns All sprites touching the self sprite
+     */
+    touchingSprite = () =>
+      getGame()
+        .getSprites()
+        .filter(
+          (sprite: Sprite) => this.touching(sprite) && sprite !== this.me
+        );
+
+    /**
+     * Checks if the self sprite is touching another sprite.
+     * @param other - The other sprite
+     * @returns Whether the self sprite is touching the other sprite
+     */
+    touching(other: Sprite) {
+      return (
+        this.me.getX() < other.getX() + other.getWidth() &&
+        this.me.getX() + this.me.getWidth() > other.getX() &&
+        this.me.getY() < other.getY() + other.getHeight() &&
+        this.me.getY() + this.me.getHeight() > other.getY()
+      );
+    }
+
+    /**
+     * Gets all sprites above the self sprite.
+     * @returns All sprites above the self sprite
+     */
+    getSpriteAboveSelf() {
+      this.me.setY(this.me.getY() - 1);
+      const touchingSprites = getGame()
+        .getSprites()
+        .filter(
+          (sprite: Sprite) =>
+            this.me.getCollision().touching(sprite) && this.me !== sprite
+        );
+      this.me.setY(this.me.getY() + 1);
+      return touchingSprites;
+    }
+
+    /**
+     * Gets all sprites below the self sprite.
+     * @returns All sprites below the self sprite
+     */
+    getSpriteBelowSelf() {
+      this.me.setY(this.me.getY() + 1);
+      const touchingSprites = getGame()
+        .getSprites()
+        .filter(
+          (sprite: Sprite) =>
+            this.me.getCollision().touching(sprite) && this.me !== sprite
+        );
+      this.me.setY(this.me.getY() - 1);
+      return touchingSprites;
+    }
+
+    /**
+     * Gets all sprites to the left of the self sprite.
+     * @returns All sprites to the left of the self sprite
+     */
+    getSpriteLeftSelf() {
+      this.me.setX(this.me.getX() - 1);
+      const touchingSprites = getGame()
+        .getSprites()
+        .filter(
+          (sprite: Sprite) =>
+            this.me.getCollision().touching(sprite) && this.me !== sprite
+        );
+      this.me.setX(this.me.getX() + 1);
+      return touchingSprites;
+    }
+
+    /**
+     * Gets all sprites to the right of the self sprite.
+     * @returns All sprites to the right of the self sprite
+     */
+    getSpriteRightSelf() {
+      this.me.setX(this.me.getX() + 1);
+      const touchingSprites = getGame()
+        .getSprites()
+        .filter(
+          (sprite: Sprite) =>
+            this.me.getCollision().touching(sprite) && this.me !== sprite
+        );
+      this.me.setX(this.me.getX() - 1);
+      return touchingSprites;
+    }
+  }
+
+  /** Platformer Sprite; Contains movement and collision features. */
+  export class Platformer extends Sprite {
+    /** The velocity of the sprite on the x axis. */
+    private vx: number;
+    /** The speed of the sprite on the x axis. */
+    private vxSpeed: number;
+    /** The maximum velocity of the sprite on the x axis. */
+    private maxVX: number | null;
+    /** The velocity of the sprite on the y axis. */
+    private vy: number;
+    /** The speed of the sprite on the y axis. */
+    private vySpeed: number;
+    /** The maximum velocity of the sprite on the y axis. */
+    private maxVY: number | null;
+    /** The gravity acceleration of the sprite. */
+    private gravityAcc: number;
+    /** Whether the sprite has a platformer below it. */
+    private hasPlatformerBelow: boolean;
+    /** Whether to check all platformers. */
+    private checkAllPlatformers: boolean;
+    /** The platformers to check collision with. */
+    private platformersToCheckCollision: Platformer[];
+
+    /**
+     * Constructor for the Platformer class.
+     * @param id - The id of the sprite
+     * @param x - The x position of the sprite
+     * @param y - The y position of the sprite
+     * @param width - The width of the sprite
+     * @param height - The height of the sprite
+     * @param color - The color of the sprite
+     * @param stageLevel - The stage level of the sprite
+     */
+    constructor(
+      id: string,
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      color: string,
+      stageLevel: number
+    ) {
+      super(id, x, y, width, height, color, stageLevel);
+      this.vx = 0;
+      this.vy = 0;
+      this.vxSpeed = 0.5;
+      this.vySpeed = 0.5;
+      this.maxVX = null;
+      this.maxVY = null;
+      this.gravityAcc = 0.2;
+      this.hasPlatformerBelow = false;
+      this.checkAllPlatformers = true;
+      this.platformersToCheckCollision = getGame().getSpritesByType(Platformer);
+    }
+
+    /**
+     * Applies gravity to the platformer sprite.
+     */
+    doGravity() {
+      if (this.checkAllPlatformers) {
+        this.platformersToCheckCollision = getGame().getSpritesByType(Platformer);
+      }
+
+      this.hasPlatformerBelow = false;
+      this.setY(this.getY() + this.getVY());
+
+      this.platformersToCheckCollision.forEach((platformer) => {
+        if (this.getCollision().touching(platformer) && this !== platformer) {
+          if (this.vy < 0) {
+            this.setY(platformer.getY() + platformer.getHeight());
+          } else {
+            this.setY(platformer.getY() - this.getHeight());
+            this.hasPlatformerBelow = true;
+          }
+
+          if (this.getCollision().touching(platformer)) {
+            this.setY(this.getY() + 0.1);
+          }
+
+          this.setVY(0);
+        }
+      });
+
+      if (!this.hasPlatformerBelow) {
+        this.setVY(this.getVY() + this.getGravityAcc());
+      }
+    }
+
+    /**
+     * Moves the platformer sprite on the x axis.
+     * @param x - The amount to move the sprite on the x axis
+     */
+    moveX(x: number) {
+      if (this.checkAllPlatformers) {
+        this.platformersToCheckCollision = getGame().getSpritesByType(Platformer);
+      }
+
+      this.setX(this.getX() + x);
+
+      const touchingPlatformers = this.platformersToCheckCollision.filter(
+        (platformer) =>
+          this.getCollision().touching(platformer) && this !== platformer
+      );
+
+      touchingPlatformers.forEach((platformer) => {
+        if (x > 0) this.setX(platformer.getX() - this.getWidth());
+        else this.setX(platformer.getX() + platformer.getWidth());
+      });
+    }
+
+    /**
+     * Moves the platformer sprite on the y axis.
+     * @param y - The amount to move the sprite on the y axis
+     */
+    moveY(y: number) {
+      if (this.checkAllPlatformers) {
+        this.platformersToCheckCollision = getGame().getSpritesByType(Platformer);
+      }
+
+      this.setY(this.getY() + y);
+
+      const touchingPlatformers = this.platformersToCheckCollision.filter(
+        (platformer) =>
+          this.getCollision().touching(platformer) && this !== platformer
+      );
+
+      touchingPlatformers.forEach((platformer) => {
+        if (y > 0) this.setY(platformer.getY() - this.getHeight());
+        else this.setY(platformer.getY() + platformer.getHeight());
+      });
+    }
+
+    /**
+     * Makes the platformer sprite jump.
+     * @param jumpHeight - The height of the jump
+     */
+    doJump(jumpHeight: number) {
+      if (this.getCollision().getSpriteBelowSelf().length > 0) {
+        this.setVY(-jumpHeight);
+      }
+    }
+
+    /**
+     * Gets all platformers above the platformer sprite.
+     * @returns All platformers above the platformer sprite
+     */
+    getPlatformerAboveSelf() {
+      return this.getCollision()
+        .getSpriteAboveSelf()
+        .filter((sprite) => sprite instanceof Platformer);
+    }
+
+    /**
+     * Gets all platformers below the platformer sprite.
+     * @returns All platformers below the platformer sprite
+     */
+    getPlatformerBelowSelf() {
+      return this.getCollision()
+        .getSpriteBelowSelf()
+        .filter((sprite) => sprite instanceof Platformer);
+    }
+
+    /**
+     * Gets all platformers to the left of the platformer sprite.
+     * @returns All platformers to the left of the platformer sprite
+     */
+    getPlatformerLeftSelf() {
+      return this.getCollision()
+        .getSpriteLeftSelf()
+        .filter((sprite) => sprite instanceof Platformer);
+    }
+
+    /**
+     * Gets all platformers to the right of the platformer sprite.
+     * @returns All platformers to the right of the platformer sprite
+     */
+    getPlatformerRightSelf() {
+      return this.getCollision()
+        .getSpriteRightSelf()
+        .filter((sprite) => sprite instanceof Platformer);
+    }
+
+    /**
+     * Adds friction to the platformer sprite on the x axis.
+     * @param friction - The friction to add
+     */
+    addFrictionX(friction: number) {
+      this.setVX(this.getVX() * friction);
+      if (Math.abs(this.getVX()) < 0.3) this.setVX(0);
+    }
+
+    /**
+     * Adds friction to the platformer sprite on the y axis.
+     * @param friction - The friction to add
+     */
+    addFrictionY(friction: number) {
+      this.setVY(this.getVY() * friction);
+      if (Math.abs(this.getVY()) < 0.3) this.setVY(0);
+    }
+
+    /**
+     * Gets the velocity of the platformer sprite on the x axis.
+     * @returns The velocity of the platformer sprite on the x axis
+     */
+    getVX() {
+      return this.vx;
+    }
+
+    /**
+     * Sets the velocity of the platformer sprite on the x axis.
+     * @param _val - The velocity to set
+     */
+    setVX(_val: number) {
+      this.vx = _val;
+      this.vx = Number(this.vx.toFixed(1));
+      if (this.maxVX !== null && this.vx > this.maxVX) this.vx = this.maxVX;
+      else if (this.maxVX !== null && this.vx < -this.maxVX)
+        this.vx = -this.maxVX;
+    }
+
+    /**
+     * Gets the speed of the platformer sprite on the x axis.
+     * @returns The speed of the platformer sprite on the x axis
+     */
+    getVXSpeed() {
+      return this.vxSpeed;
+    }
+
+    /**
+     * Sets the speed of the platformer sprite on the x axis.
+     * @param _val - The speed to set
+     */
+    setVXSpeed(_val: number) {
+      this.vxSpeed = _val;
+      this.vxSpeed = Number(this.vxSpeed.toFixed(1));
+    }
+
+    /**
+     * Gets the maximum velocity of the platformer sprite on the x axis.
+     * @returns The maximum velocity of the platformer sprite on the x axis
+     */
+    getMaxVX() {
+      return this.maxVX;
+    }
+
+    /**
+     * Sets the maximum velocity of the platformer sprite on the x axis.
+     * @param _val - The maximum velocity to set
+     */
+    setMaxVX(_val: number | null) {
+      this.maxVX = _val;
+    }
+
+    /**
+     * Gets the velocity of the platformer sprite on the y axis.
+     * @returns The velocity of the platformer sprite on the y axis
+     */
+    getVY() {
+      return this.vy;
+    }
+
+    /**
+     * Sets the velocity of the platformer sprite on the y axis.
+     * @param _val - The velocity to set
+     */
+    setVY(_val: number) {
+      this.vy = _val;
+      this.vy = Number(this.vy.toFixed(1));
+      if (this.maxVY !== null && this.vy > this.maxVY) this.vy = this.maxVY;
+      else if (this.maxVY !== null && this.vy < -this.maxVY)
+        this.vy = -this.maxVY;
+    }
+
+    /**
+     * Gets the speed of the platformer sprite on the y axis.
+     * @returns The speed of the platformer sprite on the y axis
+     */
+    getVYSpeed() {
+      return this.vySpeed;
+    }
+
+    /**
+     * Sets the speed of the platformer sprite on the y axis.
+     * @param _val - The speed to set
+     */
+    setVYSpeed(_val: number) {
+      this.vySpeed = _val;
+      this.vySpeed = Number(this.vySpeed.toFixed(1));
+    }
+
+    /**
+     * Gets the maximum velocity of the platformer sprite on the y axis.
+     * @returns The maximum velocity of the platformer sprite on the y axis
+     */
+    getMaxVY() {
+      return this.maxVY;
+    }
+
+    /**
+     * Sets the maximum velocity of the platformer sprite on the y axis.
+     * @param _val - The maximum velocity to set
+     */
+    setMaxVY(_val: number | null) {
+      this.maxVY = _val;
+    }
+
+    /**
+     * Gets the gravity acceleration of the platformer sprite.
+     * @returns The gravity acceleration of the platformer sprite
+     */
+    getGravityAcc() {
+      return this.gravityAcc;
+    }
+
+    /**
+     * Sets the gravity acceleration of the platformer sprite.
+     * @param _val - The gravity acceleration to set
+     */
+    setGravityAcc(_val: number) {
+      this.gravityAcc = _val;
+    }
+
+    /**
+     * Gets the platformers to check collision with.
+     * @returns The platformers to check collision with
+     */
+    getPlatformersToCheckCollision() {
+      return this.platformersToCheckCollision;
+    }
+
+    /**
+     * Sets the platformers to check collision with.
+     * @param _val - The platformers to check collision with
+     */
+    setPlatformerSpritesToCheckCollisionWith(_val: Platformer[]) {
+      this.platformersToCheckCollision = _val;
+    }
+  }
+
+  /** The places on the screen. */
+  export enum ScreenPlaces {
+    center,
+    verticalCenter,
+    horizontalCenter,
+    randomPosition,
   }
 
   const engine = new Engine();
 
-  export const getEngine = () => engine;
+  export const getEngine = (): Engine => engine;
+  export let getRender: () => Render;
   export let getLoader: () => Loader;
-  export let getRender: () => RenderExtension;
-  export let getGame: () => GameExtension;
+  export let getEvents: () => Events;
   export let getController: () => Controller;
+  export let getGame: () => Game;
+  export let getCamera: () => Camera;
 }

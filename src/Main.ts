@@ -1,7 +1,7 @@
-import { Neutron } from "./neutron/Neutron.ts";
-import { Player } from "./game/Player.ts";
-import { Platform } from "./game/Platform.ts";
-import { Enemy } from "./game/Enemy.ts";
+import { Neutron } from "./neutron/neutron.ts";
+import { Player } from "./game/player.ts";
+import { Platform } from "./game/platform.ts";
+import { Enemy } from "./game/enemy.ts";
 
 export function draw() {}
 
@@ -9,7 +9,7 @@ export function update() {
   // Set Referances
   const players = Neutron.getGame().getSpritesByType<Player>(Player);
   const enemies = Neutron.getGame().getSpritesByType<Enemy>(Enemy);
-  const camera = Neutron.getGame().getCamera;
+  const camera = Neutron.getCamera();
 
   // Player
   players.forEach((player) => {
@@ -40,13 +40,10 @@ export function update() {
 }
 
 export function init() {
-  // Higher Preformance Update Loop
-  Neutron.getEngine().setHigherPreformanceUpdateLoop = true;
-
   // Make Canvas Cover Full Screen
-  Neutron.getRender().makeCanvasCoverFullScreen(16, 9);
+  Neutron.getRender().ajustCanvasRatio(16, 9);
   window.addEventListener(`resize`, () =>
-    Neutron.getRender().makeCanvasCoverFullScreen(16, 9)
+    Neutron.getRender().ajustCanvasRatio(16, 9)
   );
 
   // Create Player Sprite
@@ -57,25 +54,25 @@ export function init() {
     new Platform(
       1,
       0,
-      Neutron.getRender().getHeight * (2 / 3),
-      Neutron.getRender().getWidth,
-      Neutron.getRender().getHeight
+      Neutron.getRender().getHeight() * (2 / 3),
+      Neutron.getRender().getWidth(),
+      Neutron.getRender().getHeight()
     )
   );
   Neutron.getGame().addNewSprite(
-    new Platform(2, 0, 100, 100, Neutron.getRender().getHeight)
+    new Platform(2, 0, 100, 100, Neutron.getRender().getHeight())
   );
   Neutron.getGame().addNewSprite(
     new Platform(
       3,
-      Neutron.getRender().getWidth - 100,
+      Neutron.getRender().getWidth() - 100,
       100,
       100,
-      Neutron.getRender().getHeight
+      Neutron.getRender().getHeight()
     )
   );
   Neutron.getGame().addNewSprite(
-    new Platform(4, 0, 0, Neutron.getRender().getWidth, 100)
+    new Platform(4, 0, 0, Neutron.getRender().getWidth(), 100)
   );
   Neutron.getGame().addNewSprite(new Platform(5, 100, 1000, 600, 100));
   Neutron.getGame().addNewSprite(new Platform(6, 100, 800, 400, 100));
@@ -86,14 +83,14 @@ export function init() {
     Neutron.getGame().addNewSprite(
       new Enemy(
         i,
-        Math.floor(Math.random() * Neutron.getRender().getWidth),
+        Math.floor(Math.random() * Neutron.getRender().getWidth()),
         300
       )
     );
 
   // Set Reverance to Player and Set Player Location
   const player = Neutron.getGame().getSpritesByType<Player>(Player)[0];
-  player.getMovement.to(Neutron.Enums.ScreenPlaces.center);
+  player.to(Neutron.ScreenPlaces.center);
 }
 
 export function load() {}

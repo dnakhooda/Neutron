@@ -1,44 +1,40 @@
-import { Neutron } from "../neutron/Neutron.ts";
+import { Neutron } from "../neutron/neutron.ts";
 
-export class Player extends Neutron.Sprites.Platformer {
+export class Player extends Neutron.Platformer {
   constructor(x: number, y: number) {
     super(`player`, x, y, 80, 80, `blue`, 10);
-    this.setMaxVX = 10;
-    this.setVXSpeed = 4;
-    this.setGravityAcc = 0.5;
+    this.setMaxVX(10);
+    this.setVXSpeed(4);
+    this.setGravityAcc(0.5);
   }
 
   // Player Movement
   doMovement() {
     if (Neutron.getController().getKey(`a`))
-      this.setVX = this.getVX - this.getVXSpeed;
+      this.setVX(this.getVX() - this.getVXSpeed());
 
     if (Neutron.getController().getKey(`d`))
-      this.setVX = this.getVX + this.getVXSpeed;
+      this.setVX(this.getVX() + this.getVXSpeed());
 
     if (Neutron.getController().getKey(` `)) this.doJump(18);
 
-    this.moveX(this.getVX);
+    this.moveX(this.getVX());
   }
 
   // Player Movement Constraints
   movementConstraints() {
-    if (this.getMovement.getX < 0) this.getMovement.setX = 0;
+    if (this.getX() < 0) this.setX(0);
 
-    if (this.getMovement.getY < 0) this.getMovement.setY = 0;
-
-    if (
-      this.getMovement.getX + this.getDimensions.getWidth >
-      Neutron.getRender().getWidth
-    )
-      this.getMovement.setX =
-        Neutron.getRender().getWidth - this.getDimensions.getWidth;
+    if (this.getY() < 0) this.setY(0);
 
     if (
-      this.getMovement.getY + this.getDimensions.getHeight >
-      Neutron.getRender().getHeight
+      this.getX() + this.getWidth() > Neutron.getRender().getWidth()
     )
-      this.getMovement.setY =
-        Neutron.getRender().getHeight - this.getDimensions.getHeight;
+      this.setX(Neutron.getRender().getWidth() - this.getWidth());
+
+    if (
+      this.getY() + this.getHeight() > Neutron.getRender().getHeight()
+    )
+      this.setY(Neutron.getRender().getHeight() - this.getHeight());
   }
 }

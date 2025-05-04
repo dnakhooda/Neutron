@@ -1,11 +1,11 @@
-import { Neutron } from "../neutron/Neutron.ts";
+import { Neutron } from "../neutron/neutron.ts";
 
 enum Direction {
   Left,
   Right,
 }
 
-export class Enemy extends Neutron.Sprites.Platformer {
+export class Enemy extends Neutron.Platformer {
   // Private Variables
   private direction = Direction.Right;
 
@@ -13,26 +13,26 @@ export class Enemy extends Neutron.Sprites.Platformer {
     super(`${id}enemy`, x, y, 80, 80, `green`, 10);
 
     // Setting Variables
-    this.setMaxVX = 10;
-    this.setVXSpeed = 4;
-    this.setGravityAcc = 0.5;
+    this.setMaxVX(10);
+    this.setVXSpeed(4);
+    this.setGravityAcc(0.5);
   }
 
   // Enemy Movement
   doMovement() {
     // Movement
-    this.moveX(this.getVX);
+    this.moveX(this.getVX());
     this.doJump(10);
 
     // Switch Direction If Needed
     switch (this.direction) {
       case Direction.Left:
-        this.setVX = this.getVX - this.getVXSpeed;
+        this.setVX(this.getVX() - this.getVXSpeed());
         if (this.getPlatformerLeftSelf().length > 0)
           this.direction = Direction.Right;
         break;
       case Direction.Right:
-        this.setVX = this.getVX + this.getVXSpeed;
+        this.setVX(this.getVX() + this.getVXSpeed());
         if (this.getPlatformerRightSelf().length > 0)
           this.direction = Direction.Left;
         break;
@@ -41,22 +41,18 @@ export class Enemy extends Neutron.Sprites.Platformer {
 
   // Enemy Movement Constraints
   movementConstraints() {
-    if (this.getMovement.getX < 0) this.getMovement.setX = 0;
+    if (this.getX() < 0) this.setX(0);
 
-    if (this.getMovement.getY < 0) this.getMovement.setY = 0;
-
-    if (
-      this.getMovement.getX + this.getDimensions.getWidth >
-      Neutron.getRender().getWidth
-    )
-      this.getMovement.setX =
-        Neutron.getRender().getWidth - this.getDimensions.getWidth;
+    if (this.getY() < 0) this.setY(0);
 
     if (
-      this.getMovement.getY + this.getDimensions.getHeight >
-      Neutron.getRender().getHeight
+      this.getX() + this.getWidth() > Neutron.getRender().getWidth()
     )
-      this.getMovement.setY =
-        Neutron.getRender().getHeight - this.getDimensions.getHeight;
+      this.setX(Neutron.getRender().getWidth() - this.getWidth());
+
+    if (
+      this.getY() + this.getHeight() > Neutron.getRender().getHeight()
+    )
+      this.setY(Neutron.getRender().getHeight() - this.getHeight());
   }
 }
