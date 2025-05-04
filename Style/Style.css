@@ -1,0 +1,17 @@
+.center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#canvas {
+    background-color: #000000;
+    width: 1600px;
+    height: 900px;
+}
+
+body {
+    background-color: #000000;
+    margin: 0px;
+    padding: 0px;
+}
