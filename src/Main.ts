@@ -9,7 +9,6 @@ export function update() {
   // Set Referances
   const players = Neutron.getGame().getSpritesByType<Player>(Player);
   const enemies = Neutron.getGame().getSpritesByType<Enemy>(Enemy);
-  const camera = Neutron.getCamera();
 
   // Player
   players.forEach((player) => {
@@ -34,9 +33,6 @@ export function update() {
     if (platformerBelow instanceof Platform) enemy.addFrictionX(0.7);
     else enemy.addFrictionX(0.9);
   });
-
-  // Camera
-  camera.goTo(0, 0);
 }
 
 export function init() {
@@ -91,6 +87,9 @@ export function init() {
   // Set Referance to Player and Set Player Location
   const player = Neutron.getGame().getSpritesByType<Player>(Player)[0];
   player.to(Neutron.ScreenPlaces.center);
+
+  const camera = Neutron.getCamera();
+  camera.goTo(0, 0);
 }
 
 export function load() {
