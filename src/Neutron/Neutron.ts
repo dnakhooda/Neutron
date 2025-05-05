@@ -569,7 +569,7 @@ export namespace Neutron {
 
       this.ctx.bindVertexArray(null);
 
-      this.ctx.viewport(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+      this.ctx.viewport(0, 0, this.canvas.width, this.canvas.height);
     }
 
     /**
@@ -578,13 +578,15 @@ export namespace Neutron {
      */
     private drawFunction() {
       return () => {
+        this.ctx.viewport(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.clearColor(0.0, 0.0, 0.0, 1.0);
+        this.ctx.clear(this.ctx.COLOR_BUFFER_BIT);
+
         this.visibleSprites.length = 0;
         this.visibleParticles.length = 0;
 
         const image = getGame().getBackgroundImage();
-        if (image === null) {
-          this.drawRect(0, 0, this.getWidth(), this.getHeight(), [0, 0, 0]);
-        } else {
+        if (image !== null) {
           this.drawImage(image, 0, 0, this.getWidth(), this.getHeight());
         }
 
@@ -912,6 +914,8 @@ export namespace Neutron {
       alpha: number = 1,
       rotation: number = 0
     ) {
+      console.log(x, y, width, height, alpha, rotation);
+
       this.ctx.enable(this.ctx.BLEND);
       this.ctx.blendFunc(this.ctx.SRC_ALPHA, this.ctx.ONE_MINUS_SRC_ALPHA);
 
