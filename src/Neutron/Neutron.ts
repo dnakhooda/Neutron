@@ -62,6 +62,8 @@ export namespace Neutron {
     private enableFrameSkipping: boolean;
     /** Number of frames to skip when behind */
     private framesToSkip: number;
+    /** Whether to log performance info */
+    private logPerformanceInfo: boolean;
     /** Engine running state */
     private stopVal: boolean;
     /** Initialization state */
@@ -89,6 +91,7 @@ export namespace Neutron {
       this.maxUpdatesPerFrame = 5;
       this.enableFrameSkipping = true;
       this.framesToSkip = 1;
+      this.logPerformanceInfo = false;
       this.stopVal = false;
       this.hasInited = false;
       this.hasLoadedAssets = false;
@@ -110,7 +113,7 @@ export namespace Neutron {
       );
       const loader = new Loader();
       const events = engineSettings.events;
-      const controller = new Controller(render, events);
+      const controller = new Controller(render, this, events);
       const game = new Game();
       const camera = new Camera();
 
@@ -220,6 +223,23 @@ export namespace Neutron {
         this.tps = this.tpsCounter;
         this.fpsCounter = 0;
         this.tpsCounter = 0;
+
+        if (this.logPerformanceInfo) {
+          console.log(
+            `%cNeutron Performance Info\n%cFPS: %c${this.fps}%c | TPS: %c${this.tps}%c | Target TPS: %c${this.idealTps}%c\nMin Frame Time: %c${this.minFrameTime}ms%c | Accumulated Time: %c${this.accumulatedTime}ms`,
+            "font-weight: bold; font-size: 14px; color: #4CAF50;",
+            "color: #888;",
+            "color: #2196F3; font-weight: bold;",
+            "color: #888;",
+            "color: #2196F3; font-weight: bold;",
+            "color: #888;",
+            "color: #2196F3; font-weight: bold;",
+            "color: #888;",
+            "color: #FF9800; font-weight: bold;",
+            "color: #888;",
+            "color: #FF9800; font-weight: bold;"
+          );
+        }
       }, 1000);
     };
 
@@ -257,6 +277,21 @@ export namespace Neutron {
      */
     getTps(): number {
       return this.tps;
+    }
+
+    /**
+     * Logs the performance info.
+     */
+    setLoggingPerformanceInfo(_val: boolean): void {
+      this.logPerformanceInfo = _val;
+    }
+
+    /**
+     * Gets the log performance info.
+     * @returns The log performance info
+     */
+    isLoggingPerformanceInfo(): boolean {
+      return this.logPerformanceInfo;
     }
 
     /**
@@ -308,10 +343,6 @@ export namespace Neutron {
     private uRotation: WebGLUniformLocation;
     /** The Alpha Uniform Location */
     private uAlpha: WebGLUniformLocation;
-    /** Whether to show the performance info */
-    private showPerformanceInfo: boolean;
-    /** The Performance Info Color */
-    private performanceInfoColor: string;
     /** The Scale */
     private scale: number;
     /** The Full Screen Ratio */
@@ -337,8 +368,6 @@ export namespace Neutron {
       if (!this.ctx) {
         throw new Error("WebGL2 not supported");
       }
-      this.showPerformanceInfo = false;
-      this.performanceInfoColor = "#ffffff";
       this.fullScreenRatio = null;
       this.draw = draw;
       this.scale = scale;
@@ -490,10 +519,7 @@ export namespace Neutron {
       }
       this.uRotation = uRotation;
 
-      const uAlpha = this.ctx.getUniformLocation(
-        this.shaderProgram,
-        "u_alpha"
-      );
+      const uAlpha = this.ctx.getUniformLocation(this.shaderProgram, "u_alpha");
       if (uAlpha === null) {
         throw new Error("Could not get uniform location for u_alpha");
       }
@@ -607,10 +633,6 @@ export namespace Neutron {
         });
 
         this.draw();
-
-        /*if (this.showPerformanceInfo) {
-          this.drawPerformanceInfo();
-        }*/
       };
     }
 
@@ -649,31 +671,6 @@ export namespace Neutron {
     }
 
     /**
-     * Draws performance information on screen
-     */
-    private drawPerformanceInfo() {
-      /*const performanceInfo = getEngine().getPerformanceInfo();
-      this.ctx.fillStyle = this.performanceInfoColor;
-      this.ctx.font = `${24 * this.scale}px serif`;
-
-      const lines = [
-        `FPS: ${performanceInfo.fps}`,
-        `TPS: ${performanceInfo.tps}`,
-        `Ideal TPS: ${performanceInfo.idealTps}`,
-        `Min Frame Time: ${performanceInfo.minFrameTime}`,
-        `Accumulated Time: ${performanceInfo.accumulatedTime}`,
-      ];
-
-      lines.forEach((line, index) => {
-        this.ctx.fillText(
-          line,
-          20 * this.scale,
-          (40 + index * 40) * this.scale
-        );
-      });*/
-    }
-
-    /**
      * Draws a sprite without an image on the canvas.
      * @param object - The sprite to draw
      */
@@ -697,7 +694,7 @@ export namespace Neutron {
             object.getWidth(),
             object.getHeight(),
             alpha,
-            rotation,
+            rotation
           );
         } else {
           this.ctx.uniform1i(uUseTexture, 0);
@@ -882,7 +879,7 @@ export namespace Neutron {
       width: number,
       height: number,
       alpha: number = 1,
-      rotation: number = 0,
+      rotation: number = 0
     ) {
       this.ctx.enable(this.ctx.BLEND);
       this.ctx.blendFunc(this.ctx.SRC_ALPHA, this.ctx.ONE_MINUS_SRC_ALPHA);
@@ -941,7 +938,14 @@ export namespace Neutron {
         new Float32Array(positions),
         this.ctx.STATIC_DRAW
       );
-      this.ctx.vertexAttribPointer(this.aPosition, 2, this.ctx.FLOAT, false, 0, 0);
+      this.ctx.vertexAttribPointer(
+        this.aPosition,
+        2,
+        this.ctx.FLOAT,
+        false,
+        0,
+        0
+      );
 
       this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.texcoordBuffer);
       this.ctx.bufferData(
@@ -949,7 +953,14 @@ export namespace Neutron {
         new Float32Array(texcoords),
         this.ctx.STATIC_DRAW
       );
-      this.ctx.vertexAttribPointer(this.aTexcoord, 2, this.ctx.FLOAT, false, 0, 0);
+      this.ctx.vertexAttribPointer(
+        this.aTexcoord,
+        2,
+        this.ctx.FLOAT,
+        false,
+        0,
+        0
+      );
 
       this.ctx.uniformMatrix4fv(this.uProjection, false, projMatrix);
       this.ctx.uniformMatrix4fv(this.uView, false, translationMatrix);
@@ -959,7 +970,10 @@ export namespace Neutron {
       this.ctx.activeTexture(this.ctx.TEXTURE0);
       this.ctx.bindTexture(this.ctx.TEXTURE_2D, image);
 
-      const uTexture = this.ctx.getUniformLocation(this.shaderProgram, "u_texture");
+      const uTexture = this.ctx.getUniformLocation(
+        this.shaderProgram,
+        "u_texture"
+      );
       this.ctx.uniform1i(uTexture, 0);
 
       this.ctx.drawArrays(this.ctx.TRIANGLE_STRIP, 0, 4);
@@ -1041,22 +1055,6 @@ export namespace Neutron {
     }
 
     /**
-     * Gets the performance info color.
-     * @returns The performance info color
-     */
-    getPerformanceInfoColor() {
-      return this.performanceInfoColor;
-    }
-
-    /**
-     * Sets the performance info color.
-     * @param _val - The color
-     */
-    setPerformanceInfoColor(_val: string) {
-      this.performanceInfoColor = _val;
-    }
-
-    /**
      * Gets the canvas.
      * @returns The canvas
      */
@@ -1078,22 +1076,6 @@ export namespace Neutron {
      */
     getHeight() {
       return this.canvas.height;
-    }
-
-    /**
-     * Gets the show performance info.
-     * @returns The show performance info
-     */
-    isShowingPerformanceInfo() {
-      return this.showPerformanceInfo;
-    }
-
-    /**
-     * Sets the show performance info.
-     * @param _val - The show performance info
-     */
-    setShowPerformanceInfo(_val: boolean) {
-      this.showPerformanceInfo = _val;
     }
 
     /**
@@ -1272,7 +1254,7 @@ export namespace Neutron {
      * @param render - The render object
      * @param events - The events object
      */
-    constructor(render: Render, events: Events) {
+    constructor(render: Render, engine: Engine, events: Events) {
       this.keysDown = {};
       this.mouseClientX = null;
       this.mouseClientY = null;
@@ -1290,7 +1272,9 @@ export namespace Neutron {
 
         switch (e.key) {
           case `F2`:
-            render.setShowPerformanceInfo(!render.isShowingPerformanceInfo());
+            engine.setLoggingPerformanceInfo(
+              !engine.isLoggingPerformanceInfo()
+            );
             break;
         }
 
