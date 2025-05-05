@@ -8,7 +8,7 @@ Neutron.getEngine().init({
   scale: 2,
 
   events: new Events(),
-  
+
   canvas: document.getElementById("canvas") as HTMLCanvasElement,
 
   draw: draw,

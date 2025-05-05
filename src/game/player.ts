@@ -2,10 +2,13 @@ import { Neutron } from "../neutron/neutron.ts";
 
 export class Player extends Neutron.Platformer {
   constructor(x: number, y: number) {
-    super(`player`, x, y, 80, 80, `blue`, 10);
+    super(`player`, x, y, 80, 80, `#0000ff`, 10);
     this.setMaxVX(10);
     this.setVXSpeed(4);
     this.setGravityAcc(0.5);
+    this.getCostumes().addCostume(`player`, Neutron.getLoader().getLoadedImageById(`player`));
+    this.getCostumes().setCostumeById(`player`);
+    this.getEffect().setTransparency(50);
   }
 
   // Player Movement
@@ -27,14 +30,10 @@ export class Player extends Neutron.Platformer {
 
     if (this.getY() < 0) this.setY(0);
 
-    if (
-      this.getX() + this.getWidth() > Neutron.getRender().getWidth()
-    )
+    if (this.getX() + this.getWidth() > Neutron.getRender().getWidth())
       this.setX(Neutron.getRender().getWidth() - this.getWidth());
 
-    if (
-      this.getY() + this.getHeight() > Neutron.getRender().getHeight()
-    )
+    if (this.getY() + this.getHeight() > Neutron.getRender().getHeight())
       this.setY(Neutron.getRender().getHeight() - this.getHeight());
   }
 }

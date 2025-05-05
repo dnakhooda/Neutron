@@ -10,7 +10,7 @@ export class Enemy extends Neutron.Platformer {
   private direction = Direction.Right;
 
   constructor(id: number, x: number, y: number) {
-    super(`${id}enemy`, x, y, 80, 80, `green`, 10);
+    super(`${id}enemy`, x, y, 80, 80, `#00ff00`, 10);
 
     // Setting Variables
     this.setMaxVX(10);
@@ -45,14 +45,10 @@ export class Enemy extends Neutron.Platformer {
 
     if (this.getY() < 0) this.setY(0);
 
-    if (
-      this.getX() + this.getWidth() > Neutron.getRender().getWidth()
-    )
+    if (this.getX() + this.getWidth() > Neutron.getRender().getWidth())
       this.setX(Neutron.getRender().getWidth() - this.getWidth());
 
-    if (
-      this.getY() + this.getHeight() > Neutron.getRender().getHeight()
-    )
+    if (this.getY() + this.getHeight() > Neutron.getRender().getHeight())
       this.setY(Neutron.getRender().getHeight() - this.getHeight());
   }
 }

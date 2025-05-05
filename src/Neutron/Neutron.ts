@@ -274,26 +274,56 @@ export namespace Neutron {
     }
   }
 
-  /** Handles the rendering of the game. */
+  /**
+   * Handles the rendering of the game.
+   */
   export class Render {
-    /** The Game Canvas Element */
+    /** The Canvas Element */
     private canvas: HTMLCanvasElement;
-    /** The Scale of the Canvas */
-    private scale: number;
-    /** The Context of the Canvas */
-    private ctx: CanvasRenderingContext2D;
+    /** The WebGL Context */
+    private ctx: WebGL2RenderingContext;
+    /** The Shader Program */
+    private shaderProgram: WebGLProgram;
+    /** The Vertex Array Object */
+    private vao: WebGLVertexArrayObject;
+    /** The Position Buffer */
+    private positionBuffer: WebGLBuffer;
+    /** The Color Buffer */
+    private colorBuffer: WebGLBuffer;
+    /** The Position Attribute Location */
+    private aPosition: number;
+    /** The Color Attribute Location */
+    private aColor: number;
+    /** The Texcoord Attribute Location */
+    private aTexcoord: number;
+    /** The Texcoord Buffer */
+    private texcoordBuffer: WebGLBuffer;
+    /** The Projection Uniform Location */
+    private uProjection: WebGLUniformLocation;
+    /** The Model Uniform Location */
+    private uModel: WebGLUniformLocation;
+    /** The View Uniform Location */
+    private uView: WebGLUniformLocation;
+    /** The Rotation Uniform Location */
+    private uRotation: WebGLUniformLocation;
+    /** The Alpha Uniform Location */
+    private uAlpha: WebGLUniformLocation;
     /** Whether to show the performance info */
     private showPerformanceInfo: boolean;
-    /** The color of the performance info */
+    /** The Performance Info Color */
     private performanceInfoColor: string;
-    /** The full screen ratio */
+    /** The Scale */
+    private scale: number;
+    /** The Full Screen Ratio */
     private fullScreenRatio: [number, number] | null;
+    /** The Draw Function */
+    private draw: () => void;
+    /** The Vertex Shader Source */
+    private vertexShaderSource: string;
     /** Reusable array for visible sprites */
     private visibleSprites: Sprite[] = [];
     /** Reusable array for visible particles */
     private visibleParticles: Particle[] = [];
-    /** The draw function */
-    private draw: () => void;
 
     /**
      * Constructor for the Render class.
@@ -303,32 +333,215 @@ export namespace Neutron {
      */
     constructor(canvas: HTMLCanvasElement, draw: () => void, scale: number) {
       this.canvas = canvas;
-      this.scale = scale;
-      this.ctx = this.setupCanvas(canvas);
+      this.ctx = this.canvas.getContext("webgl2") as WebGL2RenderingContext;
+      if (!this.ctx) {
+        throw new Error("WebGL2 not supported");
+      }
       this.showPerformanceInfo = false;
-      this.performanceInfoColor = `#fff`;
+      this.performanceInfoColor = "#ffffff";
       this.fullScreenRatio = null;
       this.draw = draw;
-    }
+      this.scale = scale;
 
-    /**
-     * Sets up the canvas for rendering.
-     * @param canvas - The HTMLCanvasElement to setup
-     * @returns The canvas context
-     */
-    private setupCanvas(canvas: HTMLCanvasElement) {
-      const rect = canvas.getBoundingClientRect();
+      const rect = this.canvas.getBoundingClientRect();
 
-      canvas.width = rect.width * this.scale;
-      canvas.height = rect.height * this.scale;
+      this.canvas.width = rect.width * this.scale;
+      this.canvas.height = rect.height * this.scale;
 
-      const ctx = canvas.getContext(`2d`);
+      this.vertexShaderSource = `#version 300 es
+        in vec2 a_position;
+        in vec2 a_texcoord;
+        in vec4 a_color;
 
-      if (ctx === null) {
-        throw new Error(`Canvas context is null!`);
+        out vec2 v_texcoord;
+        out vec4 v_color;
+
+        uniform mat4 u_projection;
+        uniform mat4 u_view;
+        uniform mat4 u_model;
+        uniform float u_rotation;
+
+        void main() {
+          float c = cos(u_rotation);
+          float s = sin(u_rotation);
+          mat2 rotation = mat2(c, -s, s, c);
+          vec2 rotatedPos = rotation * a_position;
+          gl_Position = u_projection * u_view * u_model * vec4(rotatedPos, 0.0, 1.0);
+          v_texcoord = a_texcoord;
+          v_color = a_color;
+        }
+      `;
+
+      const fsSource = `#version 300 es
+        precision mediump float;
+
+        in vec2 v_texcoord;
+        in vec4 v_color;
+        out vec4 fragColor;
+
+        uniform sampler2D u_texture;
+        uniform bool u_useTexture;
+        uniform float u_alpha;
+
+        void main() {
+          if (u_useTexture) {
+            vec4 texColor = texture(u_texture, v_texcoord);
+            fragColor = vec4(texColor.rgb, texColor.a * u_alpha);
+          } else {
+            fragColor = vec4(v_color.rgb, v_color.a * u_alpha);
+          }
+        }
+      `;
+
+      const vertexShader = this.ctx.createShader(this.ctx.VERTEX_SHADER);
+
+      if (vertexShader === null) {
+        throw new Error(`Vertex shader is null!`);
       }
 
-      return ctx;
+      this.ctx.shaderSource(vertexShader, this.vertexShaderSource);
+      this.ctx.compileShader(vertexShader);
+
+      if (!this.ctx.getShaderParameter(vertexShader, this.ctx.COMPILE_STATUS)) {
+        this.ctx.deleteShader(vertexShader);
+        throw new Error(
+          `Vertex shader compilation failed! Info: ${this.ctx.getShaderInfoLog(
+            vertexShader
+          )}`
+        );
+      }
+
+      const fragmentShader = this.ctx.createShader(this.ctx.FRAGMENT_SHADER);
+
+      if (fragmentShader === null) {
+        throw new Error(`Fragment shader is null!`);
+      }
+
+      this.ctx.shaderSource(fragmentShader, fsSource);
+      this.ctx.compileShader(fragmentShader);
+
+      if (
+        !this.ctx.getShaderParameter(fragmentShader, this.ctx.COMPILE_STATUS)
+      ) {
+        throw new Error(
+          `Fragment shader compilation failed! Info: ${this.ctx.getShaderInfoLog(
+            fragmentShader
+          )}`
+        );
+      }
+
+      this.shaderProgram = this.ctx.createProgram();
+
+      this.ctx.attachShader(this.shaderProgram, vertexShader);
+      this.ctx.attachShader(this.shaderProgram, fragmentShader);
+      this.ctx.linkProgram(this.shaderProgram);
+
+      if (
+        !this.ctx.getProgramParameter(this.shaderProgram, this.ctx.LINK_STATUS)
+      ) {
+        throw new Error(
+          `Program linking failed! Info: ${this.ctx.getProgramInfoLog(
+            this.shaderProgram
+          )}`
+        );
+      }
+
+      this.ctx.useProgram(this.shaderProgram);
+
+      this.aPosition = this.ctx.getAttribLocation(
+        this.shaderProgram,
+        "a_position"
+      );
+
+      this.aColor = this.ctx.getAttribLocation(this.shaderProgram, "a_color");
+
+      this.aTexcoord = this.ctx.getAttribLocation(
+        this.shaderProgram,
+        "a_texcoord"
+      );
+
+      const uProjection = this.ctx.getUniformLocation(
+        this.shaderProgram,
+        "u_projection"
+      );
+      if (uProjection === null) {
+        throw new Error("Could not get uniform location for u_projection");
+      }
+      this.uProjection = uProjection;
+
+      const uModel = this.ctx.getUniformLocation(this.shaderProgram, "u_model");
+      if (uModel === null) {
+        throw new Error("Could not get uniform location for u_model");
+      }
+      this.uModel = uModel;
+
+      const uView = this.ctx.getUniformLocation(this.shaderProgram, "u_view");
+      if (uView === null) {
+        throw new Error("Could not get uniform location for u_view");
+      }
+      this.uView = uView;
+
+      const uRotation = this.ctx.getUniformLocation(
+        this.shaderProgram,
+        "u_rotation"
+      );
+      if (uRotation === null) {
+        throw new Error("Could not get uniform location for u_rotation");
+      }
+      this.uRotation = uRotation;
+
+      const uAlpha = this.ctx.getUniformLocation(
+        this.shaderProgram,
+        "u_alpha"
+      );
+      if (uAlpha === null) {
+        throw new Error("Could not get uniform location for u_alpha");
+      }
+      this.uAlpha = uAlpha;
+
+      this.positionBuffer = this.ctx.createBuffer();
+      this.colorBuffer = this.ctx.createBuffer();
+
+      this.vao = this.ctx.createVertexArray();
+      this.ctx.bindVertexArray(this.vao);
+
+      this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.positionBuffer);
+      this.ctx.enableVertexAttribArray(this.aPosition as number);
+      this.ctx.vertexAttribPointer(
+        this.aPosition as number,
+        2,
+        this.ctx.FLOAT,
+        false,
+        0,
+        0
+      );
+
+      this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.colorBuffer);
+      this.ctx.enableVertexAttribArray(this.aColor as number);
+      this.ctx.vertexAttribPointer(
+        this.aColor as number,
+        4,
+        this.ctx.FLOAT,
+        false,
+        0,
+        0
+      );
+
+      this.texcoordBuffer = this.ctx.createBuffer();
+      this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.texcoordBuffer);
+      this.ctx.enableVertexAttribArray(this.aTexcoord);
+      this.ctx.vertexAttribPointer(
+        this.aTexcoord,
+        2,
+        this.ctx.FLOAT,
+        false,
+        0,
+        0
+      );
+
+      this.ctx.bindVertexArray(null);
+
+      this.ctx.viewport(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
     }
 
     /**
@@ -337,17 +550,19 @@ export namespace Neutron {
      */
     private drawFunction() {
       return () => {
-        this.ctx.save();
+        this.ctx.clearColor(0.8, 0.8, 0.8, 1);
+        this.ctx.clear(this.ctx.COLOR_BUFFER_BIT);
+
+        this.drawRect(0, 0, 100, 100, [1, 1, 1, 1], 1);
 
         this.visibleSprites.length = 0;
         this.visibleParticles.length = 0;
 
         const image = getGame().getBackgroundImage();
         if (image === null) {
-          this.ctx.fillStyle = `#000000`;
-          this.ctx.fillRect(0, 0, this.getWidth(), this.getHeight());
+          this.drawRect(0, 0, this.getWidth(), this.getHeight(), [0, 0, 0, 1]);
         } else {
-          this.ctx.drawImage(image, 0, 0, this.getWidth(), this.getHeight());
+          this.drawImage(image, 0, 0, this.getWidth(), this.getHeight());
         }
 
         getGame()
@@ -393,11 +608,9 @@ export namespace Neutron {
 
         this.draw();
 
-        if (this.showPerformanceInfo) {
+        /*if (this.showPerformanceInfo) {
           this.drawPerformanceInfo();
-        }
-
-        this.ctx.restore();
+        }*/
       };
     }
 
@@ -439,7 +652,7 @@ export namespace Neutron {
      * Draws performance information on screen
      */
     private drawPerformanceInfo() {
-      const performanceInfo = getEngine().getPerformanceInfo();
+      /*const performanceInfo = getEngine().getPerformanceInfo();
       this.ctx.fillStyle = this.performanceInfoColor;
       this.ctx.font = `${24 * this.scale}px serif`;
 
@@ -457,61 +670,46 @@ export namespace Neutron {
           20 * this.scale,
           (40 + index * 40) * this.scale
         );
-      });
+      });*/
     }
 
     /**
      * Draws a sprite without an image on the canvas.
      * @param object - The sprite to draw
      */
-    drawSprite(object: Sprite) {
+    private drawSprite(object: Sprite): void {
       if (!object.getEffect().getHidden()) {
-        this.ctx.globalAlpha = 1 - object.getEffect().getTransparency() / 100;
-        this.ctx.fillStyle = object.getColor();
-        this.ctx.translate(
-          object.getX() + object.getWidth() / 2 - getCamera().getX(),
-          object.getY() + object.getHeight() / 2 - getCamera().getY()
+        const alpha = 1 - object.getEffect().getTransparency() / 100;
+        const color = this.hexToRgb(object.getColor());
+        const rotation = (object.getEffect().getRotation() * Math.PI) / 180;
+        const uUseTexture = this.ctx.getUniformLocation(
+          this.shaderProgram,
+          "u_useTexture"
         );
-        this.ctx.rotate((object.getEffect().getRotation() * Math.PI) / 180);
-        this.ctx.translate(
-          -(object.getX() + object.getWidth() / 2 - getCamera().getX()),
-          -(object.getY() + object.getHeight() / 2 - getCamera().getY())
-        );
-        if (object.getEffect().getIsEclipse()) {
-          this.ctx.beginPath();
-          this.ctx.ellipse(
+
+        if (object.getCostumes().getCostume() !== null) {
+          const image = object.getCostumes().getCostume() as HTMLImageElement;
+          this.ctx.uniform1i(uUseTexture, 1);
+          this.drawImage(
+            image,
             object.getX() - getCamera().getX(),
             object.getY() - getCamera().getY(),
-            object.getWidth() / 2,
-            object.getHeight() / 2,
-            0,
-            0,
-            2 * Math.PI
+            object.getWidth(),
+            object.getHeight(),
+            alpha,
+            rotation,
           );
-          this.ctx.fill();
-          this.ctx.closePath();
         } else {
-          if (object.getCostumes().getCostume() === null) {
-            this.ctx.fillStyle = object.getColor();
-            this.ctx.fillRect(
-              object.getX() - getCamera().getX(),
-              object.getY() - getCamera().getY(),
-              object.getWidth(),
-              object.getHeight()
-            );
-          } else {
-            const costume = object
-              .getCostumes()
-              .getCostume() as HTMLImageElement;
-            this.ctx.drawImage(
-              costume,
-              object.getX() - getCamera().getX(),
-              object.getY() - getCamera().getY(),
-              object.getWidth(),
-              object.getHeight()
-            );
-          }
-          this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+          this.ctx.uniform1i(uUseTexture, 0);
+          this.drawRect(
+            object.getX() - getCamera().getX(),
+            object.getY() - getCamera().getY(),
+            object.getWidth(),
+            object.getHeight(),
+            [color[0], color[1], color[2], 1],
+            alpha,
+            rotation
+          );
         }
       }
     }
@@ -520,29 +718,287 @@ export namespace Neutron {
      * Draws a particle.
      * @param particle - The particle to draw
      */
-    drawParticle(particle: Particle) {
-      this.ctx.globalAlpha = 1 - particle.getTransparency() / 100;
-      this.ctx.fillStyle = particle.getColor();
-      if (particle.getIsEclipse()) {
-        this.ctx.beginPath();
-        this.ctx.ellipse(
-          particle.getX() - getCamera().getX(),
-          particle.getY() - getCamera().getY(),
-          particle.getWidth() / 2,
-          particle.getHeight() / 2,
-          0,
-          0,
-          2 * Math.PI
-        );
-        this.ctx.fill();
-      } else {
-        this.ctx.fillRect(
-          particle.getX() - getCamera().getX(),
-          particle.getY() - getCamera().getY(),
-          particle.getWidth(),
-          particle.getHeight()
-        );
-      }
+    private drawParticle(particle: Particle): void {
+      const alpha = 1 - particle.getTransparency() / 100;
+      const color = this.hexToRgb(particle.getColor());
+      this.drawRect(
+        particle.getX() - getCamera().getX(),
+        particle.getY() - getCamera().getY(),
+        particle.getWidth(),
+        particle.getHeight(),
+        [color[0], color[1], color[2], alpha],
+        0
+      );
+    }
+
+    /**
+     * Converts hex color to RGB.
+     * @param hex - The hex color
+     * @returns The RGB color
+     */
+    private hexToRgb(hex: string): number[] {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result
+        ? [
+            parseInt(result[1], 16) / 255,
+            parseInt(result[2], 16) / 255,
+            parseInt(result[3], 16) / 255,
+          ]
+        : [0, 0, 0];
+    }
+
+    /**
+     * Draws a rectangle.
+     * @param x - X position
+     * @param y - Y position
+     * @param width - Width
+     * @param height - Height
+     * @param color - Color
+     */
+    private drawRect(
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      color: number[],
+      alpha: number = 1,
+      rotation: number = 0
+    ): void {
+      this.ctx.enable(this.ctx.BLEND);
+      this.ctx.blendFunc(this.ctx.SRC_ALPHA, this.ctx.ONE_MINUS_SRC_ALPHA);
+
+      const positions = [
+        -width / 2,
+        -height / 2,
+        width / 2,
+        -height / 2,
+        -width / 2,
+        height / 2,
+        width / 2,
+        height / 2,
+      ];
+
+      const colors = [
+        color[0],
+        color[1],
+        color[2],
+        color[3],
+        color[0],
+        color[1],
+        color[2],
+        color[3],
+        color[0],
+        color[1],
+        color[2],
+        color[3],
+        color[0],
+        color[1],
+        color[2],
+        color[3],
+      ];
+
+      const projMatrix = this.orthographic(
+        0,
+        this.canvas.width,
+        this.canvas.height,
+        0
+      );
+
+      const translationMatrix = new Float32Array([
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        x + width / 2,
+        y + height / 2,
+        0,
+        1,
+      ]);
+
+      this.ctx.uniform1f(this.uAlpha, alpha);
+
+      this.ctx.uniformMatrix4fv(this.uProjection, false, projMatrix);
+      this.ctx.uniformMatrix4fv(this.uView, false, translationMatrix);
+      this.ctx.uniformMatrix4fv(
+        this.uModel,
+        false,
+        new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
+      );
+
+      this.ctx.uniform1f(this.uRotation, rotation);
+
+      this.ctx.useProgram(this.shaderProgram);
+      this.ctx.bindVertexArray(this.vao);
+
+      this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.positionBuffer);
+      this.ctx.bufferData(
+        this.ctx.ARRAY_BUFFER,
+        new Float32Array(positions),
+        this.ctx.STATIC_DRAW
+      );
+
+      this.ctx.vertexAttribPointer(
+        this.aPosition as number,
+        2,
+        this.ctx.FLOAT,
+        false,
+        0,
+        0
+      );
+
+      this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.colorBuffer);
+      this.ctx.bufferData(
+        this.ctx.ARRAY_BUFFER,
+        new Float32Array(colors),
+        this.ctx.STATIC_DRAW
+      );
+
+      this.ctx.vertexAttribPointer(
+        this.aColor as number,
+        4,
+        this.ctx.FLOAT,
+        false,
+        0,
+        0
+      );
+
+      this.ctx.drawArrays(this.ctx.TRIANGLE_STRIP, 0, 4);
+
+      this.ctx.bindVertexArray(null);
+    }
+
+    private drawImage(
+      image: WebGLTexture,
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      alpha: number = 1,
+      rotation: number = 0,
+    ) {
+      this.ctx.enable(this.ctx.BLEND);
+      this.ctx.blendFunc(this.ctx.SRC_ALPHA, this.ctx.ONE_MINUS_SRC_ALPHA);
+
+      const positions = [
+        -width / 2,
+        -height / 2,
+        width / 2,
+        -height / 2,
+        -width / 2,
+        height / 2,
+        width / 2,
+        height / 2,
+      ];
+
+      const texcoords = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0];
+
+      const projMatrix = this.orthographic(
+        0,
+        this.canvas.width,
+        this.canvas.height,
+        0
+      );
+
+      const translationMatrix = new Float32Array([
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        x + width / 2,
+        y + height / 2,
+        0,
+        1,
+      ]);
+
+      const modelMatrix = new Float32Array([
+        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
+      ]);
+
+      this.ctx.useProgram(this.shaderProgram);
+      this.ctx.bindVertexArray(this.vao);
+
+      this.ctx.uniform1f(this.uAlpha, alpha);
+
+      this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.positionBuffer);
+      this.ctx.bufferData(
+        this.ctx.ARRAY_BUFFER,
+        new Float32Array(positions),
+        this.ctx.STATIC_DRAW
+      );
+      this.ctx.vertexAttribPointer(this.aPosition, 2, this.ctx.FLOAT, false, 0, 0);
+
+      this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.texcoordBuffer);
+      this.ctx.bufferData(
+        this.ctx.ARRAY_BUFFER,
+        new Float32Array(texcoords),
+        this.ctx.STATIC_DRAW
+      );
+      this.ctx.vertexAttribPointer(this.aTexcoord, 2, this.ctx.FLOAT, false, 0, 0);
+
+      this.ctx.uniformMatrix4fv(this.uProjection, false, projMatrix);
+      this.ctx.uniformMatrix4fv(this.uView, false, translationMatrix);
+      this.ctx.uniformMatrix4fv(this.uModel, false, modelMatrix);
+      this.ctx.uniform1f(this.uRotation, rotation);
+
+      this.ctx.activeTexture(this.ctx.TEXTURE0);
+      this.ctx.bindTexture(this.ctx.TEXTURE_2D, image);
+
+      const uTexture = this.ctx.getUniformLocation(this.shaderProgram, "u_texture");
+      this.ctx.uniform1i(uTexture, 0);
+
+      this.ctx.drawArrays(this.ctx.TRIANGLE_STRIP, 0, 4);
+
+      this.ctx.bindVertexArray(null);
+    }
+
+    /**
+     * Orthographic projection.
+     * @param left - The left
+     * @param right - The right
+     * @param bottom - The bottom
+     * @param top - The top
+     * @returns The orthographic projection
+     */
+    private orthographic(
+      left: number,
+      right: number,
+      bottom: number,
+      top: number
+    ): Float32Array {
+      return new Float32Array([
+        2 / (right - left),
+        0,
+        0,
+        0,
+        0,
+        2 / (top - bottom),
+        0,
+        0,
+        0,
+        0,
+        -1,
+        0,
+        -(right + left) / (right - left),
+        -(top + bottom) / (top - bottom),
+        0,
+        1,
+      ]);
     }
 
     /**
@@ -644,7 +1100,7 @@ export namespace Neutron {
      * Gets the context of the canvas.
      * @returns The context of the canvas
      */
-    getCtx(): CanvasRenderingContext2D {
+    getCtx() {
       return this.ctx;
     }
 
@@ -668,9 +1124,11 @@ export namespace Neutron {
   /** Handles the loading of game assets. */
   export class Loader {
     /** All image assets to load */
-    private images: [string, HTMLImageElement][];
+    private images: {
+      [id: string]: WebGLTexture;
+    };
     /** All audio assets to load */
-    private audio: [string, HTMLAudioElement][];
+    private audio: { [id: string]: HTMLAudioElement };
     /** The number of assets to load */
     private assetsToLoad: number;
 
@@ -678,8 +1136,8 @@ export namespace Neutron {
      * Constructor for the Loader class.
      */
     constructor() {
-      this.images = [];
-      this.audio = [];
+      this.images = {};
+      this.audio = {};
       this.assetsToLoad = 0;
     }
 
@@ -692,8 +1150,27 @@ export namespace Neutron {
       this.assetsToLoad++;
       let image = new Image();
       image.src = src;
-      this.images.push([id, image]);
-      image.onload = () => this.assetsToLoad--;
+      this.images[id] = image;
+      image.onload = () => {
+        this.assetsToLoad--;
+
+        const ctx = Neutron.getRender().getCtx();
+        const texture = ctx.createTexture();
+        ctx.bindTexture(ctx.TEXTURE_2D, texture);
+
+        ctx.texImage2D(
+          ctx.TEXTURE_2D,
+          0,
+          ctx.RGBA,
+          ctx.RGBA,
+          ctx.UNSIGNED_BYTE,
+          image
+        );
+
+        ctx.generateMipmap(ctx.TEXTURE_2D);
+
+        this.images[id] = texture;
+      };
     }
 
     /**
@@ -704,7 +1181,7 @@ export namespace Neutron {
     loadAudio(id: string, src: string) {
       this.assetsToLoad++;
       let audio = new Audio(src);
-      this.audio.push([id, audio]);
+      this.audio[id] = audio;
       audio.onload = () => this.assetsToLoad--;
     }
 
@@ -713,16 +1190,14 @@ export namespace Neutron {
      * @param id - The id of the image
      * @returns The loaded image
      */
-    getLoadedImageById = (id: string) =>
-      this.images.filter((image) => image[0] === id)[0][1];
+    getLoadedImageById = (id: string) => this.images[id];
 
     /**
      * Gets the loaded audio by id.
      * @param id - The id of the audio
      * @returns The loaded audio
      */
-    getLoadedAudioById = (id: string) =>
-      this.audio.filter((audio) => audio[0] === id)[0][1];
+    getLoadedAudioById = (id: string) => this.audio[id];
 
     /**
      * Gets the number of assets to load.
@@ -1348,7 +1823,7 @@ export namespace Neutron {
         y,
         width,
         height,
-        `#fff`,
+        `#ffffff`,
         0
       );
 
@@ -1905,11 +2380,9 @@ export namespace Neutron {
   /** Handles the costumes of the sprite. */
   class Costumes {
     /** The costumes */
-    private costumes: { [id: string]: HTMLImageElement | null } = {
-      NONE: null,
-    };
+    private costumes: { [id: string]: WebGLTexture | null };
     /** The current costume */
-    private id = `NONE`;
+    private id: string;
 
     /**
      * Constructor for the Costumes class.
@@ -1926,7 +2399,7 @@ export namespace Neutron {
      * @param id - The id
      * @param image - The image
      */
-    addCostume(id: string, image: HTMLImageElement | null) {
+    addCostume(id: string, image: WebGLTexture | null) {
       if (id.toUpperCase() === `NONE`) {
         throw new Error(`Cannot add Costume as Id 'None'!`);
       }
