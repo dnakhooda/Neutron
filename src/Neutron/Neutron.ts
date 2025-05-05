@@ -214,8 +214,7 @@ export namespace Neutron {
 
     /**
      * Starts the performance tracker to monitor frame rate and ticks per second;
-     * updates FPS and TPS counters every second.
-     * @private
+     * updates FPS and TPS counters every second. Logs performance info to the console.
      */
     private startPerformanceTracker = (): void => {
       setInterval(() => {
@@ -343,6 +342,8 @@ export namespace Neutron {
     private uRotation: WebGLUniformLocation;
     /** The Alpha Uniform Location */
     private uAlpha: WebGLUniformLocation;
+    /** Eclipse Segments */
+    private eclipseSegments: number;
     /** The Scale */
     private scale: number;
     /** The Full Screen Ratio */
@@ -363,6 +364,7 @@ export namespace Neutron {
      * @param scale - The scale of the canvas
      */
     constructor(canvas: HTMLCanvasElement, draw: () => void, scale: number) {
+      this.eclipseSegments = 100;
       this.canvas = canvas;
       this.ctx = this.canvas.getContext("webgl2") as WebGL2RenderingContext;
       if (!this.ctx) {
@@ -576,17 +578,12 @@ export namespace Neutron {
      */
     private drawFunction() {
       return () => {
-        this.ctx.clearColor(0.8, 0.8, 0.8, 1);
-        this.ctx.clear(this.ctx.COLOR_BUFFER_BIT);
-
-        this.drawRect(0, 0, 100, 100, [1, 1, 1, 1], 1);
-
         this.visibleSprites.length = 0;
         this.visibleParticles.length = 0;
 
         const image = getGame().getBackgroundImage();
         if (image === null) {
-          this.drawRect(0, 0, this.getWidth(), this.getHeight(), [0, 0, 0, 1]);
+          this.drawRect(0, 0, this.getWidth(), this.getHeight(), [0, 0, 0]);
         } else {
           this.drawImage(image, 0, 0, this.getWidth(), this.getHeight());
         }
@@ -671,7 +668,7 @@ export namespace Neutron {
     }
 
     /**
-     * Draws a sprite without an image on the canvas.
+     * Draws a sprite on the canvas.
      * @param object - The sprite to draw
      */
     private drawSprite(object: Sprite): void {
@@ -698,15 +695,27 @@ export namespace Neutron {
           );
         } else {
           this.ctx.uniform1i(uUseTexture, 0);
-          this.drawRect(
-            object.getX() - getCamera().getX(),
-            object.getY() - getCamera().getY(),
-            object.getWidth(),
-            object.getHeight(),
-            [color[0], color[1], color[2], 1],
-            alpha,
-            rotation
-          );
+          if (object.getEffect().getIsEclipse()) {
+            this.drawEllipse(
+              object.getX() - getCamera().getX(),
+              object.getY() - getCamera().getY(),
+              object.getWidth(),
+              object.getHeight(),
+              [color[0], color[1], color[2]],
+              alpha,
+              rotation
+            );
+          } else {
+            this.drawRect(
+              object.getX() - getCamera().getX(),
+              object.getY() - getCamera().getY(),
+              object.getWidth(),
+              object.getHeight(),
+              [color[0], color[1], color[2]],
+              alpha,
+              rotation
+            );
+          }
         }
       }
     }
@@ -718,16 +727,26 @@ export namespace Neutron {
     private drawParticle(particle: Particle): void {
       const alpha = 1 - particle.getTransparency() / 100;
       const color = this.hexToRgb(particle.getColor());
-      this.drawRect(
-        particle.getX() - getCamera().getX(),
-        particle.getY() - getCamera().getY(),
-        particle.getWidth(),
-        particle.getHeight(),
-        [color[0], color[1], color[2], alpha],
-        0
-      );
+      if (particle.getIsEclipse()) {
+        this.drawEllipse(
+          particle.getX() - getCamera().getX(),
+          particle.getY() - getCamera().getY(),
+          particle.getWidth(),
+          particle.getHeight(),
+          [color[0], color[1], color[2]],
+          alpha
+        );
+      } else {
+        this.drawRect(
+          particle.getX() - getCamera().getX(),
+          particle.getY() - getCamera().getY(),
+          particle.getWidth(),
+          particle.getHeight(),
+          [color[0], color[1], color[2]],
+          alpha
+        );
+      }
     }
-
     /**
      * Converts hex color to RGB.
      * @param hex - The hex color
@@ -751,13 +770,15 @@ export namespace Neutron {
      * @param width - Width
      * @param height - Height
      * @param color - Color
+     * @param alpha - Alpha
+     * @param rotation - Rotation
      */
     private drawRect(
       x: number,
       y: number,
       width: number,
       height: number,
-      color: number[],
+      color: [number, number, number],
       alpha: number = 1,
       rotation: number = 0
     ): void {
@@ -779,19 +800,19 @@ export namespace Neutron {
         color[0],
         color[1],
         color[2],
-        color[3],
+        1,
         color[0],
         color[1],
         color[2],
-        color[3],
+        1,
         color[0],
         color[1],
         color[2],
-        color[3],
+        1,
         color[0],
         color[1],
         color[2],
-        color[3],
+        1,
       ];
 
       const projMatrix = this.orthographic(
@@ -872,6 +893,16 @@ export namespace Neutron {
       this.ctx.bindVertexArray(null);
     }
 
+    /**
+     * Draws an image on the canvas.
+     * @param image - The image to draw
+     * @param x - The x position
+     * @param y - The y position
+     * @param width - The width
+     * @param height - The height
+     * @param alpha - Alpha
+     * @param rotation - Rotation
+     */
     private drawImage(
       image: WebGLTexture,
       x: number,
@@ -979,6 +1010,145 @@ export namespace Neutron {
       this.ctx.drawArrays(this.ctx.TRIANGLE_STRIP, 0, 4);
 
       this.ctx.bindVertexArray(null);
+    }
+
+    /**
+     * Draws an ellipse on the canvas.
+     * @param x - The x position
+     * @param y - The y position
+     * @param width - The width
+     * @param height - The height
+     * @param color - The color
+     * @param alpha - Alpha
+     * @param rotation - Rotation
+     */
+    private drawEllipse(
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      color: [number, number, number],
+      alpha: number = 1,
+      rotation: number = 0
+    ) {
+      this.ctx.enable(this.ctx.BLEND);
+      this.ctx.blendFunc(this.ctx.SRC_ALPHA, this.ctx.ONE_MINUS_SRC_ALPHA);
+
+      const positions = this.createEllipseVertices(
+        0,
+        0,
+        width / 2,
+        height / 2,
+        this.eclipseSegments
+      );
+
+      const colors: number[] = [];
+      for (let i = 0; i < positions.length / 2; i++) {
+        colors.push(color[0], color[1], color[2], 1.0);
+      }
+
+      const projMatrix = this.orthographic(
+        0,
+        this.canvas.width,
+        this.canvas.height,
+        0
+      );
+
+      const translationMatrix = new Float32Array([
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        x + width / 2,
+        y + height / 2,
+        0,
+        1,
+      ]);
+
+      this.ctx.useProgram(this.shaderProgram);
+      this.ctx.bindVertexArray(this.vao);
+
+      this.ctx.uniform1f(this.uAlpha, alpha);
+      this.ctx.uniformMatrix4fv(this.uProjection, false, projMatrix);
+      this.ctx.uniformMatrix4fv(this.uView, false, translationMatrix);
+      this.ctx.uniformMatrix4fv(
+        this.uModel,
+        false,
+        new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
+      );
+      this.ctx.uniform1f(this.uRotation, rotation);
+
+      // Upload position data
+      this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.positionBuffer);
+      this.ctx.bufferData(
+        this.ctx.ARRAY_BUFFER,
+        new Float32Array(positions),
+        this.ctx.STATIC_DRAW
+      );
+      this.ctx.vertexAttribPointer(
+        this.aPosition as number,
+        2,
+        this.ctx.FLOAT,
+        false,
+        0,
+        0
+      );
+
+      // Upload color data
+      this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.colorBuffer);
+      this.ctx.bufferData(
+        this.ctx.ARRAY_BUFFER,
+        new Float32Array(colors),
+        this.ctx.STATIC_DRAW
+      );
+      this.ctx.vertexAttribPointer(
+        this.aColor as number,
+        4,
+        this.ctx.FLOAT,
+        false,
+        0,
+        0
+      );
+
+      this.ctx.drawArrays(this.ctx.TRIANGLE_FAN, 0, positions.length / 2);
+
+      this.ctx.bindVertexArray(null);
+    }
+
+    /**
+     * Creates the ellipse vertices.
+     * @param cx - The x position
+     * @param cy - The y position
+     * @param rx - The x radius
+     * @param ry - The y radius
+     * @param segments - The segments
+     * @returns The vertices
+     */
+    private createEllipseVertices(
+      cx: number,
+      cy: number,
+      rx: number,
+      ry: number,
+      segments: number = 100
+    ): number[] {
+      const vertices = [cx, cy];
+
+      for (let i = 0; i <= segments; i++) {
+        const theta = (i / segments) * 2 * Math.PI;
+        const x = cx + rx * Math.cos(theta);
+        const y = cy + ry * Math.sin(theta);
+        vertices.push(x, y);
+      }
+
+      return vertices;
     }
 
     /**
@@ -1092,6 +1262,22 @@ export namespace Neutron {
      */
     getScale(): number {
       return this.scale;
+    }
+
+    /**
+     * Gets the eclipse segments.
+     * @returns The eclipse segments
+     */
+    getEclipseSegments(): number {
+      return this.eclipseSegments;
+    }
+
+    /**
+     * Sets the eclipse segments.
+     * @param segments - The segments
+     */
+    setEclipseSegments(segments: number) {
+      this.eclipseSegments = segments;
     }
 
     /**

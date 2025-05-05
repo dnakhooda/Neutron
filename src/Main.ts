@@ -88,10 +88,8 @@ export function init() {
       )
     );
 
-  // Set Reverance to Player and Set Player Location
+  // Set Referance to Player and Set Player Location
   const player = Neutron.getGame().getSpritesByType<Player>(Player)[0];
-  player.getEffect().setTransparency(50);
-  player.getEffect().setRotation(45);
   player.to(Neutron.ScreenPlaces.center);
 }
 

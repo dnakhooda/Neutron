@@ -6,9 +6,6 @@ export class Player extends Neutron.Platformer {
     this.setMaxVX(10);
     this.setVXSpeed(4);
     this.setGravityAcc(0.5);
-    this.getCostumes().addCostume(`player`, Neutron.getLoader().getLoadedImageById(`player`));
-    this.getCostumes().setCostumeById(`player`);
-    this.getEffect().setTransparency(50);
   }
 
   // Player Movement
