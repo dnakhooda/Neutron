@@ -818,23 +818,11 @@ export namespace Neutron {
       );
 
       const translationMatrix = new Float32Array([
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        x + width / 2,
-        y + height / 2,
-        0,
-        1,
-      ]);
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        x + width / 2, y + height / 2, 0, 1
+    ]);
 
       this.ctx.uniform1f(this.uAlpha, alpha);
 
@@ -1049,8 +1037,6 @@ export namespace Neutron {
       this.ctx.blendFunc(this.ctx.SRC_ALPHA, this.ctx.ONE_MINUS_SRC_ALPHA);
 
       const positions = this.createEclipseVertices(
-        x,
-        y,
         width / 2,
         height / 2,
         this.eclipseSegments
@@ -1146,23 +1132,21 @@ export namespace Neutron {
      * @returns The vertices
      */
     private createEclipseVertices(
-      cx: number,
-      cy: number,
       rx: number,
       ry: number,
       segments: number = 100
-    ): number[] {
-      const vertices = [cx, cy];
-
+  ): number[] {
+      const vertices = [0, 0];
+  
       for (let i = 0; i <= segments; i++) {
-        const theta = (i / segments) * 2 * Math.PI;
-        const x = cx + rx * Math.cos(theta);
-        const y = cy + ry * Math.sin(theta);
-        vertices.push(x, y);
+          const theta = (i / segments) * 2 * Math.PI;
+          const x = rx * Math.cos(theta);
+          const y = ry * Math.sin(theta);
+          vertices.push(x, y);
       }
-
+  
       return vertices;
-    }
+  }
 
     /**
      * Orthographic projection.
