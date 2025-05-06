@@ -6,8 +6,8 @@
   "author": "dnakhood",
   "license": "ISC",
   "type": "module",
-  "types": "index.d.ts",
-  "main": "build/index.ts",
+  "main": "build/neutron.cjs",
+  "types": "build/neutron.d.ts",
   "files": [
     "build",
     "README.md"

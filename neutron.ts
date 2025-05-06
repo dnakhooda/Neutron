@@ -3191,3 +3191,5 @@ export namespace Neutron {
     engine.init(engineSettings);
   };
 }
+
+export default Neutron;
