@@ -1,15 +1,25 @@
 {
-  "name": "neutron",
-  "private": true,
-  "version": "0.0.0",
+  "name": "neutron-game",
+  "private": false,
+  "version": "1.0.0",
+  "description": "A game engine framework for creating interactive games/applications.",
+  "author": "dnakhood",
+  "license": "ISC",
   "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
-  },
+  "types": "index.d.ts",
+  "main": "build/index.ts",
+  "files": [
+    "build",
+    "README.md"
+  ],
   "devDependencies": {
-    "typescript": "~5.7.2",
-    "vite": "^6.3.1"
+    "typescript": "^5.8.3"
+  },
+  "scripts": {
+    "build": "npx tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dnakhooda/Neutron.git"
   }
 }
