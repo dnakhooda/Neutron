@@ -8,6 +8,15 @@
   "type": "module",
   "main": "build/neutron.cjs",
   "types": "build/neutron.d.ts",
+  "keywords": [
+    "Games Engine",
+    "Game Framework",
+    "Typescript",
+    "Canvas",
+    "WebGL",
+    "Physics",
+    "2D"
+  ],
   "files": [
     "build",
     "README.md"
