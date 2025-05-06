@@ -1,7 +1,7 @@
 {
   "name": "neutron-game",
   "private": false,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A game engine framework for creating interactive games/applications.",
   "author": "dnakhood",
   "license": "ISC",
