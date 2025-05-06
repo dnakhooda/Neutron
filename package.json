@@ -13,10 +13,11 @@
     "README.md"
   ],
   "devDependencies": {
+    "tsup": "^8.4.0",
     "typescript": "^5.8.3"
   },
   "scripts": {
-    "build": "npx tsc"
+    "build": "tsup"
   },
   "repository": {
     "type": "git",
