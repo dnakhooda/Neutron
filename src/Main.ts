@@ -92,6 +92,4 @@ export function init() {
   camera.goTo(0, 0);
 }
 
-export function load() {
-  Neutron.getLoader().loadImage(`player`, `./public/O.png`);
-}
+export function load() {}

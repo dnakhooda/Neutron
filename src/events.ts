@@ -13,14 +13,14 @@ export class Events implements Neutron.Events {
     this.touchEvent = null;
   }
 
-  onClick(e: KeyboardEvent) {
+  onKeyDown(e: KeyboardEvent) {
     switch (e.key) {
       case ``:
         break;
     }
   }
 
-  offClick(e: KeyboardEvent) {
+  onKeyUp(e: KeyboardEvent) {
     switch (e.key) {
       case ``:
         break;

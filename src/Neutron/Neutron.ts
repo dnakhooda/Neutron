@@ -9,75 +9,79 @@
 
 /**
  * Neutron namespace provides a game engine framework for creating interactive applications;
- * includes core functionality for rendering, game state management, and event handling.
+ * includes core functionality for rendering, game state management, and event handling and more.
  */
 export namespace Neutron {
   /**
    * Interface defining the settings and components required to initialize the game engine.
    */
   interface EngineSettings {
-    /** HTMLCanvasElement of the game */
+    /** HTMLCanvasElement for the game. This is where all rendering will occur. */
     canvas: HTMLCanvasElement;
-    /** Target ticks per second for the game loop */
+    /** Target ticks per second for the game loop. Controls how often the game state updates. */
     tps: number;
-    /** Scale of the game canvas */
+    /** Scale of the canvas. 1 is normal, 2 is double the size, 3 is triple the size, etc. */
     scale: number;
-    /** Events object */
+    /** Events object that implements the Events interface for handling user input. */
     events: Events;
 
-    /** Function called every frame to draw the game */
+    /** Function called every frame when drawing the game. Handles all rendering operations. */
     draw: () => void;
-    /** Function called every tick to update game state */
+    /** Function called every tick when updating the game state. Handles game logic and physics. */
     update: () => void;
-    /** Function called once when the game is initialized */
+    /** Function called to initialize the game. Sets up initial game state. */
     init: () => void;
     /** Function called to load game assets */
     load: () => void;
   }
 
   /**
-   * Manages the game loop, rendering, and game state updates; provides functionality for
-   * controlling frame rate, performance monitoring, and game state management.
+   * Manages the game loop, rendering, and game state updates.
+   * The Engine class is responsible for:
+   * - Controlling frame rate and game speed
+   * - Managing performance monitoring
+   * - Handling game state updates
+   * - Coordinating between different game systems
    */
-  export class Engine {
-    /** Current frames per second */
+  class Engine {
+    /** Current frames per second. Updated every second. */
     private fps: number;
-    /** Current ticks per second */
+    /** Current ticks per second. Updated every second. */
     private tps: number;
-    /** Counter for FPS calculation */
+    /** Counter for FPS (frames per second) calculation. Reset every second. */
     private fpsCounter: number;
-    /** Counter for TPS calculation */
+    /** Counter for TPS (ticks per second) calculation. Reset every second. */
     private tpsCounter: number;
-    /** Target ticks per second for the game loop */
+    /** Target ticks per second for the game loop. Controls game speed. */
     private idealTps: number;
-    /** Timestamp of the last update */
+    /** Timestamp of the last update. Used for delta time calculation. */
     private lastUpdateTime: number;
-    /** Minimum time between updates in milliseconds */
+    /** Minimum time between updates in milliseconds. Based on idealTps. */
     private minFrameTime: number;
-    /** Accumulated time since last update */
+    /** Accumulated time since last update. Used for fixed time step updates. */
     private accumulatedTime: number;
-    /** Maximum number of updates per frame */
+    /** Maximum number of updates per frame. */
     private maxUpdatesPerFrame: number;
-    /** Whether to enable frame skipping for slow devices */
+    /** Whether to enable frame skipping for slow devices. */
     private enableFrameSkipping: boolean;
-    /** Number of frames to skip when behind */
+    /** Number of frames to skip when behind. Helps maintain performance. */
     private framesToSkip: number;
-    /** Whether to log performance info */
+    /** Whether to log performance info to console. */
     private logPerformanceInfo: boolean;
-    /** Engine running state */
+    /** Whether the game loop should stop. */
     private stopVal: boolean;
-    /** Initialization state */
+    /** Whether the game has been initialized. */
     private hasInited: boolean;
-    /** Asset loading state */
+    /** Whether the game has loaded all assets. */
     private hasLoadedAssets: boolean;
-    /** Game update function */
+    /** Function called every frame when updating the game. */
     private update: () => void;
-    /** Initialization function */
+    /** Function called to initialize the game. */
     private initFunc: () => void;
 
     /**
-     * Creates a new instance of the Engine class.
      * Initializes default values for performance monitoring and game loop settings.
+     * Sets up the engine with reasonable defaults for most games.
      */
     constructor() {
       this.fps = 0;
@@ -102,8 +106,9 @@ export namespace Neutron {
     /**
      * Initializes the game engine with the provided settings.
      * Sets up the render loop, game state management, and event handling.
+     *
      * @param engineSettings - Configuration object containing all necessary engine components
-     * and settings
+     * @throws Error if required components are missing or invalid
      */
     init(engineSettings: EngineSettings): void {
       const render = new Render(
@@ -211,7 +216,7 @@ export namespace Neutron {
         this.accumulatedTime = this.minFrameTime * 5;
       }
 
-      getRender().getDrawFunction()();
+      getRender().drawFunction()();
 
       window.requestAnimationFrame(this.startLoop);
     };
@@ -255,7 +260,7 @@ export namespace Neutron {
 
     /**
      * Starts or resumes the game engine loop.
-     * Resets timing variables to ensure consistent behavior.
+     * Resets timing variables.
      */
     start(): void {
       if (this.stopVal) {
@@ -264,6 +269,20 @@ export namespace Neutron {
         this.accumulatedTime = 0;
         this.startLoop();
       }
+    }
+
+    /**
+     * Gets the performance info.
+     * @returns The performance info object
+     */
+    getPerformanceInfo() {
+      return {
+        fps: this.fps,
+        tps: this.tps,
+        idealTps: this.idealTps,
+        minFrameTime: this.minFrameTime,
+        accumulatedTime: this.accumulatedTime,
+      };
     }
 
     /**
@@ -283,39 +302,58 @@ export namespace Neutron {
     }
 
     /**
-     * Logs the performance info.
+     * Sets whether to log the performance info.
+     * @param _val - Whether to log the performance info
      */
     setLoggingPerformanceInfo(_val: boolean): void {
       this.logPerformanceInfo = _val;
     }
 
     /**
-     * Gets the log performance info.
-     * @returns The log performance info
+     * Gets whether the engine is logging performance info.
+     * @returns Whether the engine is logging performance info
      */
     isLoggingPerformanceInfo(): boolean {
       return this.logPerformanceInfo;
     }
 
     /**
-     * Gets the performance info.
-     * @returns The performance info object
+     * Gets the ideal ticks per second.
+     * @returns The ideal TPS value
      */
-    getPerformanceInfo() {
-      return {
-        fps: this.fps,
-        tps: this.tps,
-        idealTps: this.idealTps,
-        minFrameTime: this.minFrameTime,
-        accumulatedTime: this.accumulatedTime,
-      };
+    getIdealTps(): number {
+      return this.idealTps;
+    }
+
+    /**
+     * Sets the ideal ticks per second.
+     * @param _val - The ideal TPS value
+     */
+    setIdealTps(_val: number): void {
+      this.idealTps = _val;
+    }
+
+    /**
+     * Sets whether to enable frame skipping.
+     * @param _val - Whether to enable frame skipping
+     */
+    setEnableFrameSkipping(_val: boolean): void {
+      this.enableFrameSkipping = _val;
+    }
+
+    /**
+     * Gets whether frame skipping is enabled.
+     * @returns Whether frame skipping is enabled
+     */
+    getEnableFrameSkipping(): boolean {
+      return this.enableFrameSkipping;
     }
   }
 
   /**
    * Handles the rendering of the game.
    */
-  export class Render {
+  class Render {
     /** The Canvas Element */
     private canvas: HTMLCanvasElement;
     /** The WebGL Context */
@@ -328,14 +366,14 @@ export namespace Neutron {
     private positionBuffer: WebGLBuffer;
     /** The Color Buffer */
     private colorBuffer: WebGLBuffer;
+    /** The Texcoord Buffer */
+    private texcoordBuffer: WebGLBuffer;
     /** The Position Attribute Location */
     private aPosition: number;
     /** The Color Attribute Location */
     private aColor: number;
     /** The Texcoord Attribute Location */
     private aTexcoord: number;
-    /** The Texcoord Buffer */
-    private texcoordBuffer: WebGLBuffer;
     /** The Projection Uniform Location */
     private uProjection: WebGLUniformLocation;
     /** The Model Uniform Location */
@@ -346,6 +384,8 @@ export namespace Neutron {
     private uRotation: WebGLUniformLocation;
     /** The Alpha Uniform Location */
     private uAlpha: WebGLUniformLocation;
+    /** The Vertex Shader Source */
+    private vertexShaderSource: string;
     /** Eclipse Segments */
     private eclipseSegments: number;
     /** The Scale */
@@ -354,12 +394,6 @@ export namespace Neutron {
     private fullScreenRatio: [number, number] | null;
     /** The Draw Function */
     private draw: () => void;
-    /** The Vertex Shader Source */
-    private vertexShaderSource: string;
-    /** Reusable array for visible sprites */
-    private visibleSprites: Sprite[] = [];
-    /** Reusable array for visible particles */
-    private visibleParticles: Particle[] = [];
 
     /**
      * Constructor for the Render class.
@@ -580,97 +614,38 @@ export namespace Neutron {
      * Returns a function that draws the game on the canvas.
      * @returns The draw function
      */
-    private drawFunction() {
-      return () => {
+    drawFunction() {
+      return (() => {
         this.ctx.viewport(0, 0, this.canvas.width, this.canvas.height);
         this.ctx.clearColor(0.0, 0.0, 0.0, 1.0);
         this.ctx.clear(this.ctx.COLOR_BUFFER_BIT);
 
-        this.visibleSprites.length = 0;
-        this.visibleParticles.length = 0;
-
         const image = getGame().getBackgroundImage();
+
         if (image !== null) {
-          this.drawImage(image, 0, 0, this.getWidth(), this.getHeight());
+          this.drawImage(0, 0, this.getWidth(), this.getHeight(), image);
         }
 
         getGame()
           .getParticles()
           .forEach((particle) => {
-            if (
-              this.isVisible(
-                particle,
-                getCamera().getX(),
-                getCamera().getY(),
-                this.getWidth(),
-                this.getHeight()
-              )
-            ) {
-              this.visibleParticles.push(particle);
+            if (particle.isOnScreen()) {
+              this.drawParticle(particle);
+              particle.draw();
             }
           });
 
         getGame()
           .getSprites()
           .forEach((sprite) => {
-            if (
-              this.isVisible(
-                sprite,
-                getCamera().getX(),
-                getCamera().getY(),
-                this.getWidth(),
-                this.getHeight()
-              )
-            ) {
-              this.visibleSprites.push(sprite);
+            if (sprite.isOnScreen()) {
+              this.drawSprite(sprite);
+              sprite.draw();
             }
           });
 
-        this.visibleParticles.forEach((particle) => {
-          this.drawParticle(particle);
-        });
-
-        this.visibleSprites.forEach((sprite) => {
-          this.drawSprite(sprite);
-          sprite.draw();
-        });
-
         this.draw();
-      };
-    }
-
-    /**
-     * Checks if an object is visible on screen
-     * @param obj - The object to check
-     * @param cameraX - Camera X position
-     * @param cameraY - Camera Y position
-     * @param screenWidth - Screen width
-     * @param screenHeight - Screen height
-     * @returns Whether the object is visible
-     */
-    private isVisible(
-      obj: {
-        getX: () => number;
-        getY: () => number;
-        getWidth: () => number;
-        getHeight: () => number;
-      },
-      cameraX: number,
-      cameraY: number,
-      screenWidth: number,
-      screenHeight: number
-    ): boolean {
-      const x = obj.getX() - cameraX;
-      const y = obj.getY() - cameraY;
-      const width = obj.getWidth();
-      const height = obj.getHeight();
-
-      return (
-        x + width >= 0 &&
-        x <= screenWidth &&
-        y + height >= 0 &&
-        y <= screenHeight
-      );
+      }).bind(this);
     }
 
     /**
@@ -678,88 +653,91 @@ export namespace Neutron {
      * @param object - The sprite to draw
      */
     private drawSprite(object: Sprite): void {
-      if (!object.getEffect().getHidden()) {
-        const alpha = 1 - object.getEffect().getTransparency() / 100;
-        const color = this.hexToRgb(object.getColor());
-        const rotation = (object.getEffect().getRotation() * Math.PI) / 180;
-        const uUseTexture = this.ctx.getUniformLocation(
-          this.shaderProgram,
-          "u_useTexture"
-        );
-
-        if (object.getCostumes().getCostume() !== null) {
-          const image = object.getCostumes().getCostume() as HTMLImageElement;
-          this.ctx.uniform1i(uUseTexture, 1);
-          this.drawImage(
-            image,
-            object.getX() - getCamera().getX(),
-            object.getY() - getCamera().getY(),
-            object.getWidth(),
-            object.getHeight(),
-            alpha,
-            rotation
-          );
-        } else {
-          this.ctx.uniform1i(uUseTexture, 0);
-          if (object.getEffect().getIsEclipse()) {
-            this.drawEllipse(
-              object.getX() - getCamera().getX(),
-              object.getY() - getCamera().getY(),
-              object.getWidth(),
-              object.getHeight(),
-              [color[0], color[1], color[2]],
-              alpha,
-              rotation
-            );
-          } else {
-            this.drawRect(
-              object.getX() - getCamera().getX(),
-              object.getY() - getCamera().getY(),
-              object.getWidth(),
-              object.getHeight(),
-              [color[0], color[1], color[2]],
-              alpha,
-              rotation
-            );
-          }
-        }
+      if (object.getEffect().getHidden()) {
+        return;
       }
+
+      const alpha = 1 - object.getEffect().getTransparency() / 100;
+      const color = this.hexToRgb(object.getColor());
+      const rotation = (object.getEffect().getRotation() * Math.PI) / 180;
+
+      if (object.getCostumes().getCostume() !== null) {
+        const image = object.getCostumes().getCostume() as HTMLImageElement;
+        this.drawImage(
+          object.getX() - getCamera().getX(),
+          object.getY() - getCamera().getY(),
+          object.getWidth(),
+          object.getHeight(),
+          image,
+          alpha,
+          rotation
+        );
+        return;
+      }
+
+      if (object.getEffect().getIsEclipse()) {
+        this.drawEclipse(
+          object.getX() - getCamera().getX(),
+          object.getY() - getCamera().getY(),
+          object.getWidth(),
+          object.getHeight(),
+          [color[0], color[1], color[2]],
+          alpha,
+          rotation
+        );
+        return;
+      }
+
+      this.drawRect(
+        object.getX() - getCamera().getX(),
+        object.getY() - getCamera().getY(),
+        object.getWidth(),
+        object.getHeight(),
+        [color[0], color[1], color[2]],
+        alpha,
+        rotation
+      );
     }
 
     /**
-     * Draws a particle.
+     * Draws a particle on the canvas.
      * @param particle - The particle to draw
      */
     private drawParticle(particle: Particle): void {
-      const alpha = 1 - particle.getTransparency() / 100;
-      const color = this.hexToRgb(particle.getColor());
-      const uUseTexture = this.ctx.getUniformLocation(
-        this.shaderProgram,
-        "u_useTexture"
-      );
-      this.ctx.uniform1i(uUseTexture, 0);
-      if (particle.getIsEclipse()) {
-        this.drawEllipse(
-          particle.getX() - getCamera().getX(),
-          particle.getY() - getCamera().getY(),
-          particle.getWidth(),
-          particle.getHeight(),
-          [color[0], color[1], color[2]],
-          alpha
-        );
-      } else {
-        this.drawRect(
-          particle.getX() - getCamera().getX(),
-          particle.getY() - getCamera().getY(),
-          particle.getWidth(),
-          particle.getHeight(),
-          [color[0], color[1], color[2]],
-          alpha
-        );
+      if (particle.getEffects().getHidden()) {
+        return;
       }
+
+      const alpha = 1 - particle.getEffects().getTransparency() / 100;
+      const color = this.hexToRgb(particle.getColor());
+      const rotation = (particle.getEffects().getRotation() * Math.PI) / 180;
+
+      if (particle.getEffects().getIsEclipse()) {
+        this.drawEclipse(
+          particle.getX() - getCamera().getX(),
+          particle.getY() - getCamera().getY(),
+          particle.getWidth(),
+          particle.getHeight(),
+          [color[0], color[1], color[2]],
+          alpha,
+          rotation
+        );
+        return;
+      }
+
+      this.drawRect(
+        particle.getX() - getCamera().getX(),
+        particle.getY() - getCamera().getY(),
+        particle.getWidth(),
+        particle.getHeight(),
+        [color[0], color[1], color[2]],
+        alpha,
+        rotation
+      );
     }
+
     /**
-     * Converts hex color to RGB.
+     * Converts hex color string to RGB array.
      * @param hex - The hex color
      * @returns The RGB color
      */
@@ -775,7 +753,7 @@ export namespace Neutron {
     }
 
     /**
-     * Draws a rectangle.
+     * Draws a rectangle on the canvas.
      * @param x - X position
      * @param y - Y position
      * @param width - Width
@@ -793,6 +771,12 @@ export namespace Neutron {
       alpha: number = 1,
       rotation: number = 0
     ): void {
+      const uUseTexture = this.ctx.getUniformLocation(
+        this.shaderProgram,
+        "u_useTexture"
+      );
+      this.ctx.uniform1i(uUseTexture, 0);
+
       this.ctx.enable(this.ctx.BLEND);
       this.ctx.blendFunc(this.ctx.SRC_ALPHA, this.ctx.ONE_MINUS_SRC_ALPHA);
 
@@ -906,23 +890,29 @@ export namespace Neutron {
 
     /**
      * Draws an image on the canvas.
-     * @param image - The image to draw
      * @param x - The x position
      * @param y - The y position
      * @param width - The width
      * @param height - The height
+     * @param image - The image to draw
      * @param alpha - Alpha
      * @param rotation - Rotation
      */
     private drawImage(
-      image: WebGLTexture,
       x: number,
       y: number,
       width: number,
       height: number,
+      image: WebGLTexture,
       alpha: number = 1,
       rotation: number = 0
     ) {
+      const uUseTexture = this.ctx.getUniformLocation(
+        this.shaderProgram,
+        "u_useTexture"
+      );
+      this.ctx.uniform1i(uUseTexture, 1);
+
       this.ctx.enable(this.ctx.BLEND);
       this.ctx.blendFunc(this.ctx.SRC_ALPHA, this.ctx.ONE_MINUS_SRC_ALPHA);
 
@@ -1031,7 +1021,7 @@ export namespace Neutron {
     }
 
     /**
-     * Draws an ellipse on the canvas.
+     * Draws an eclipse on the canvas.
      * @param x - The x position
      * @param y - The y position
      * @param width - The width
@@ -1040,7 +1030,7 @@ export namespace Neutron {
      * @param alpha - Alpha
      * @param rotation - Rotation
      */
-    private drawEllipse(
+    private drawEclipse(
       x: number,
       y: number,
       width: number,
@@ -1049,12 +1039,18 @@ export namespace Neutron {
       alpha: number = 1,
       rotation: number = 0
     ) {
+      const uUseTexture = this.ctx.getUniformLocation(
+        this.shaderProgram,
+        "u_useTexture"
+      );
+      this.ctx.uniform1i(uUseTexture, 0);
+
       this.ctx.enable(this.ctx.BLEND);
       this.ctx.blendFunc(this.ctx.SRC_ALPHA, this.ctx.ONE_MINUS_SRC_ALPHA);
 
-      const positions = this.createEllipseVertices(
-        0,
-        0,
+      const positions = this.createEclipseVertices(
+        x,
+        y,
         width / 2,
         height / 2,
         this.eclipseSegments
@@ -1141,7 +1137,7 @@ export namespace Neutron {
     }
 
     /**
-     * Creates the ellipse vertices.
+     * Creates the eclipse vertices.
      * @param cx - The x position
      * @param cy - The y position
      * @param rx - The x radius
@@ -1149,7 +1145,7 @@ export namespace Neutron {
      * @param segments - The segments
      * @returns The vertices
      */
-    private createEllipseVertices(
+    private createEclipseVertices(
       cx: number,
       cy: number,
       rx: number,
@@ -1234,14 +1230,6 @@ export namespace Neutron {
     }
 
     /**
-     * Gets the draw function.
-     * @returns The draw function
-     */
-    getDrawFunction() {
-      return this.drawFunction().bind(this);
-    }
-
-    /**
      * Gets the canvas.
      * @returns The canvas
      */
@@ -1301,18 +1289,18 @@ export namespace Neutron {
      * Gets the full screen ratios.
      * @returns The full screen ratios
      */
-    getFullScreenRatios(): [number, number] | null {
+    getAdjustedCanvasRatios(): [number, number] | null {
       return this.fullScreenRatio;
     }
   }
 
   /** Handles the loading of game assets. */
-  export class Loader {
-    /** All image assets to load */
+  class Loader {
+    /** Image assets */
     private images: {
       [id: string]: WebGLTexture;
     };
-    /** All audio assets to load */
+    /** Audio assets */
     private audio: { [id: string]: HTMLAudioElement };
     /** The number of assets to load */
     private assetsToLoad: number;
@@ -1404,10 +1392,10 @@ export namespace Neutron {
     /** Whether the touch is down */
     isTouchDown: boolean;
 
-    /** Handles the click event */
-    onClick(e: KeyboardEvent): void;
-    /** Handles the off click event */
-    offClick(e: KeyboardEvent): void;
+    /** Handles the on key down event */
+    onKeyDown(e: KeyboardEvent): void;
+    /** Handles the on key up event */
+    onKeyUp(e: KeyboardEvent): void;
 
     /** Handles the mouse down event */
     mouseDown(e: MouseEvent): void;
@@ -1430,7 +1418,7 @@ export namespace Neutron {
   }
 
   /** Handles game controls. */
-  export class Controller {
+  class Controller {
     /** Dictionary of currently pressed keys */
     private keysDown: { [key: string]: boolean };
     /** Unajusted mouse X coordinate */
@@ -1481,13 +1469,13 @@ export namespace Neutron {
             break;
         }
 
-        this.eventObj.onClick(e);
+        this.eventObj.onKeyDown(e);
       };
 
       document.onkeyup = (e: KeyboardEvent) => {
         e.preventDefault();
         this.keysDown[e.key] = false;
-        this.eventObj.offClick(e);
+        this.eventObj.onKeyUp(e);
       };
 
       render.getCanvas().addEventListener(`mousedown`, (e) => {
@@ -1759,10 +1747,10 @@ export namespace Neutron {
   }
 
   /** Handles the game state. */
-  export class Game {
-    /** List of sprites in the game */
+  class Game {
+    /** Array of all sprites in the game */
     private sprites: Sprite[];
-    /** List of particles in the game */
+    /** Array of all particles in the game */
     private particles: Particle[];
     /** The background image of the game */
     private background: HTMLImageElement | null;
@@ -1772,7 +1760,8 @@ export namespace Neutron {
     private mapReaderCanvas: HTMLCanvasElement;
 
     /**
-     * Constructor for the Game class.
+     * Creates a new game instance.
+     * Initializes an empty array of sprites, particles, background, and map reader image and canvas.
      */
     constructor() {
       this.sprites = [];
@@ -2146,38 +2135,35 @@ export namespace Neutron {
     }
   }
 
-  /** Handles the sprite. */
-  export class Sprite {
-    /** The id */
+  /**
+   * Base class for all game objects in the engine.
+   * Provides common functionality for position, size, and basic game object behavior.
+   * All game objects (sprites, particles, etc.) inherit from this class.
+   */
+  class GameObject {
+    /** Unique identifier for the game object */
     private id: string;
-    /** The x coordinate */
+    /** X coordinate of the game object's position */
     private x: number;
-    /** The y coordinate */
+    /** Y coordinate of the game object's position */
     private y: number;
-    /** The width */
+    /** Width of the game object */
     private width: number;
-    /** The height */
+    /** Height of the game object */
     private height: number;
-    /** The color */
+    /** Color of the game object in hexadecimal format */
     private color: string;
-    /** The stage level */
-    private stageLevel: number;
-    /** The costumes */
-    private costumes = new Costumes();
-    /** The effects */
-    private effects = new Effects();
-    /** The collision */
-    private collision = new Collision(this);
 
     /**
-     * Constructor for the Sprite class.
-     * @param id - The id
-     * @param x - The x coordinate
-     * @param y - The y coordinate
-     * @param width - The width
-     * @param height - The height
-     * @param color - The color
-     * @param stageLevel - The stage level
+     * Creates a new game object with the specified properties.
+     *
+     * @param id - Unique identifier for the game object
+     * @param x - Initial x coordinate
+     * @param y - Initial y coordinate
+     * @param width - Width of the game object
+     * @param height - Height of the game object
+     * @param color - Color in hexadecimal format (e.g., "#FF0000" for red)
+     * @throws Error if a game object with the same id already exists
      */
     constructor(
       id: string,
@@ -2185,8 +2171,7 @@ export namespace Neutron {
       y: number,
       width: number,
       height: number,
-      color: string,
-      stageLevel: number
+      color: string
     ) {
       if (getGame().getSpriteById(id)) {
         throw new Error(`Sprite ${id} already exists!`);
@@ -2198,12 +2183,25 @@ export namespace Neutron {
       this.width = width;
       this.height = height;
       this.color = color;
-      this.stageLevel = stageLevel;
     }
 
     /**
-     * Checks if the sprite is on screen.
-     * @returns Whether the sprite is on screen
+     * Updates the game object's state.
+     * Called every game tick. Override this method to implement custom update logic.
+     */
+    update() {}
+
+    /**
+     * Draws the game object.
+     * Called every frame. Override this method to implement custom drawing logic.
+     */
+    draw() {}
+
+    /**
+     * Checks if the game object is currently visible on screen.
+     * Takes into account the camera position and viewport size.
+     *
+     * @returns true if any part of the game object is visible on screen
      */
     isOnScreen() {
       return (
@@ -2215,18 +2213,21 @@ export namespace Neutron {
     }
 
     /**
-     * Goes to a location.
-     * @param _valx - The x coordinate
-     * @param _valy - The y coordinate
+     * Moves the game object to the specified position.
+     *
+     * @param x - New x coordinate
+     * @param y - New y coordinate
      */
-    goTo(_valx: number, _valy: number) {
-      this.x = _valx;
-      this.y = _valy;
+    goTo(x: number, y: number) {
+      this.x = x;
+      this.y = y;
     }
 
     /**
-     * Goes to a location.
-     * @param place - The place
+     * Moves the game object to a predefined screen position.
+     *
+     * @param place - The screen position to move to
+     * @throws Error if an invalid screen place is specified
      */
     to(place: ScreenPlaces) {
       switch (place) {
@@ -2254,41 +2255,36 @@ export namespace Neutron {
             Math.floor(Math.random() * getRender().getHeight())
           );
           break;
+        default:
+          throw new Error(`Invalid screen place: ${place}`);
       }
     }
 
     /**
-     * Updates the sprite.
-     */
-    update() {}
-
-    /**
-     * Draws the sprite.
-     */
-    draw() {}
-
-    /**
-     * Gets the id.
-     * @returns The id
+     * Gets the unique identifier of the game object.
+     *
+     * @returns The game object's id
      */
     getId() {
       return this.id;
     }
 
     /**
-     * Sets the id.
-     * @param _val - The id
+     * Sets a new unique identifier for the game object.
+     *
+     * @param id - The new id
+     * @throws Error if a game object with the same id already exists
      */
-    setId(_val: string) {
-      if (getGame().getSpriteById(_val)) {
-        throw new Error(`Sprite ${_val} already exists!`);
+    setId(id: string) {
+      if (getGame().getSpriteById(id)) {
+        throw new Error(`Sprite ${id} already exists!`);
       }
-
-      this.id = _val;
+      this.id = id;
     }
 
     /**
-     * Gets the x coordinate.
+     * Gets the x coordinate of the game object.
+     *
      * @returns The x coordinate
      */
     getX() {
@@ -2296,15 +2292,17 @@ export namespace Neutron {
     }
 
     /**
-     * Sets the x coordinate.
-     * @param _val - The x coordinate
+     * Sets the x coordinate of the game object.
+     *
+     * @param x - The new x coordinate
      */
-    setX(_val: number) {
-      this.x = _val;
+    setX(x: number) {
+      this.x = x;
     }
 
     /**
-     * Gets the y coordinate.
+     * Gets the y coordinate of the game object.
+     *
      * @returns The y coordinate
      */
     getY() {
@@ -2312,15 +2310,17 @@ export namespace Neutron {
     }
 
     /**
-     * Sets the y coordinate.
-     * @param _val - The y coordinate
+     * Sets the y coordinate of the game object.
+     *
+     * @param y - The new y coordinate
      */
-    setY(_val: number) {
-      this.y = _val;
+    setY(y: number) {
+      this.y = y;
     }
 
     /**
-     * Gets the width.
+     * Gets the width of the game object.
+     *
      * @returns The width
      */
     getWidth() {
@@ -2328,15 +2328,17 @@ export namespace Neutron {
     }
 
     /**
-     * Sets the width.
-     * @param _val - The width
+     * Sets the width of the game object.
+     *
+     * @param width - The new width
      */
-    setWidth(_val: number) {
-      this.width = _val;
+    setWidth(width: number) {
+      this.width = width;
     }
 
     /**
-     * Gets the height.
+     * Gets the height of the game object.
+     *
      * @returns The height
      */
     getHeight() {
@@ -2344,235 +2346,253 @@ export namespace Neutron {
     }
 
     /**
-     * Sets the height.
-     * @param _val - The height
+     * Sets the height of the game object.
+     *
+     * @param height - The new height
      */
-    setHeight(_val: number) {
-      this.height = _val;
+    setHeight(height: number) {
+      this.height = height;
     }
 
     /**
-     * Gets the color.
-     * @returns The color
+     * Gets the color of the game object.
+     *
+     * @returns The color in hexadecimal format
      */
     getColor() {
       return this.color;
     }
 
     /**
-     * Sets the color.
-     * @param _val - The color
+     * Sets the color of the game object.
+     *
+     * @param color - The new color in hexadecimal format
      */
-    setColor(_val: string) {
-      this.color = _val;
+    setColor(color: string) {
+      this.color = color;
+    }
+  }
+
+  /**
+   * A sprite is a game object that can have costumes, effects, and collision detection.
+   * Sprites are the main interactive elements in a game.
+   */
+  export class Sprite extends GameObject {
+    /** The layer level of the sprite (determines drawing order) */
+    private stageLevel: number;
+    /** Manages the sprite's costumes (appearances) */
+    private costumes: Costumes;
+    /** Manages the sprite's visual effects */
+    private effects: Effects;
+    /** Handles collision detection for the sprite */
+    private collision: Collision;
+
+    /**
+     * Creates a new sprite with the specified properties.
+     *
+     * @param id - Unique identifier for the sprite
+     * @param x - Initial x coordinate
+     * @param y - Initial y coordinate
+     * @param width - Width of the sprite
+     * @param height - Height of the sprite
+     * @param color - Default color in hexadecimal format
+     * @param stageLevel - The layer level (0 is bottom, higher numbers are drawn on top)
+     * @throws Error if a sprite with the same id already exists
+     */
+    constructor(
+      id: string,
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      color: string,
+      stageLevel: number
+    ) {
+      super(id, x, y, width, height, color);
+      this.stageLevel = stageLevel;
+      this.effects = new Effects();
+      this.costumes = new Costumes();
+      this.collision = new Collision(this);
     }
 
     /**
-     * Gets the stage level.
-     * @returns The stage level
+     * Gets the stage level of the sprite.
+     *
+     * @returns The stage level (0 is bottom, higher numbers are drawn on top)
      */
     getStageLevel() {
       return this.stageLevel;
     }
 
     /**
-     * Sets the stage level.
-     * @param _val - The stage level
+     * Sets the stage level of the sprite.
+     *
+     * @param stageLevel - The new stage level
      */
-    setStageLevel(_val: number) {
-      this.stageLevel = _val;
+    setStageLevel(stageLevel: number) {
+      this.stageLevel = stageLevel;
     }
 
     /**
-     * Gets the effects.
-     * @returns The effects
+     * Gets the effects manager for this sprite.
+     *
+     * @returns The Effects object managing this sprite's visual effects
      */
     getEffect() {
       return this.effects;
     }
 
     /**
-     * Gets the collision.
-     * @returns The collision
-     */
-    getCollision() {
-      return this.collision;
-    }
-
-    /**
-     * Gets the costumes.
-     * @returns The costumes
+     * Gets the costumes manager for this sprite.
+     *
+     * @returns The Costumes object managing this sprite's appearances
      */
     getCostumes() {
       return this.costumes;
     }
-  }
-
-  /** Handles the effects of the sprite. */
-  class Effects {
-    /** Whether the sprite is hidden */
-    private hidden: boolean;
-    /** The transparency */
-    private transparency: number;
-    /** The rotation */
-    private rotation: number;
-    /** Whether the sprite is an eclipse */
-    private isEclipse: boolean;
-    /** The eclipse rotation */
-    private eclipseRotation: number;
-    /** The eclipse start angle */
-    private eclipseStartAngle: number;
-    /** The eclipse end angle */
-    private eclipseEndAngle: number;
 
     /**
-     * Constructor for the Effects class.
+     * Gets the collision manager for this sprite.
+     *
+     * @returns The Collision object handling this sprite's collision detection
+     */
+    getCollision() {
+      return this.collision;
+    }
+  }
+
+  /**
+   * Manages visual effects for game objects.
+   * Handles properties like visibility, transparency, rotation, and shape effects.
+   */
+  class Effects {
+    /** Whether the game object is hidden (not rendered) */
+    private hidden: boolean;
+    /** Transparency level (0-100, where 0 is fully visible and 100 is fully transparent) */
+    private transparency: number;
+    /** Rotation angle in degrees (0-360) */
+    private rotation: number;
+    /** Whether the game object should be rendered as an ellipse instead of a rectangle */
+    private isEclipse: boolean;
+
+    /**
+     * Creates a new Effects manager with default values.
+     * Default values:
+     * - visible (not hidden)
+     * - fully opaque (0% transparency)
+     * - no rotation (0 degrees)
+     * - rectangular shape (not an ellipse)
      */
     constructor() {
       this.hidden = false;
       this.transparency = 0;
       this.rotation = 0;
       this.isEclipse = false;
-      this.eclipseRotation = 0;
-      this.eclipseStartAngle = 0;
-      this.eclipseEndAngle = 2 * Math.PI;
     }
 
     /**
-     * Clears the effects.
+     * Resets all effects to their default values.
+     * Makes the game object visible, fully opaque, unrotated, and rectangular.
      */
     clearEffects() {
       this.hidden = false;
       this.transparency = 0;
       this.rotation = 0;
       this.isEclipse = false;
-      this.eclipseRotation = 0;
-      this.eclipseStartAngle = 0;
-      this.eclipseEndAngle = 2 * Math.PI;
     }
 
     /**
-     * Gets whether the sprite is hidden.
-     * @returns Whether the sprite is hidden
+     * Gets whether the game object is hidden.
+     *
+     * @returns true if the game object is hidden, false if visible
      */
     getHidden() {
       return this.hidden;
     }
 
     /**
-     * Sets whether the sprite is hidden.
-     * @param _val - Whether the sprite is hidden
+     * Sets whether the game object is hidden.
+     *
+     * @param hidden - true to hide the game object, false to show it
      */
-    setHidden(_val: boolean) {
-      this.hidden = _val;
+    setHidden(hidden: boolean) {
+      this.hidden = hidden;
     }
 
     /**
-     * Gets the transparency.
-     * @returns The transparency
+     * Gets the transparency level of the game object.
+     *
+     * @returns The transparency level (0-100)
      */
     getTransparency() {
       return this.transparency;
     }
 
     /**
-     * Sets the transparency.
-     * @param _val - The transparency
+     * Sets the transparency level of the game object.
+     *
+     * @param transparency - The new transparency level (0-100)
+     * @throws Error if transparency is not between 0 and 100
      */
-    setTransparency(_val: number) {
-      this.transparency = _val;
+    setTransparency(transparency: number) {
+      if (transparency < 0 || transparency > 100) {
+        throw new Error(
+          `Transparency must be between 0 and 100, got ${transparency}`
+        );
+      }
+      this.transparency = transparency;
     }
 
     /**
-     * Gets the rotation.
-     * @returns The rotation
+     * Gets the rotation angle of the game object.
+     *
+     * @returns The rotation angle in degrees (0-360)
      */
     getRotation() {
       return this.rotation;
     }
 
     /**
-     * Sets the rotation.
-     * @param _val - The rotation
+     * Sets the rotation angle of the game object.
+     *
+     * @param rotation - The new rotation angle in degrees
      */
-    setRotation(_val: number) {
-      this.rotation = _val;
+    setRotation(rotation: number) {
+      this.rotation = rotation;
     }
 
     /**
-     * Gets whether the sprite is an eclipse.
-     * @returns Whether the sprite is an eclipse
+     * Gets whether the game object is rendered as an ellipse.
+     *
+     * @returns true if the game object is an ellipse, false if it's a rectangle
      */
     getIsEclipse() {
       return this.isEclipse;
     }
 
     /**
-     * Sets whether the sprite is an eclipse.
-     * @param _val - Whether the sprite is an eclipse
+     * Sets whether the game object should be rendered as an ellipse.
+     *
+     * @param isEclipse - true to render as an ellipse, false to render as a rectangle
      */
-    setIsEclipse(_val: boolean) {
-      this.isEclipse = _val;
-    }
-
-    /**
-     * Gets the eclipse rotation.
-     * @returns The eclipse rotation
-     */
-    getEclipseRotation() {
-      return this.eclipseRotation;
-    }
-
-    /**
-     * Sets the eclipse rotation.
-     * @param _val - The eclipse rotation
-     */
-    setEclipseRotation(_val: number) {
-      this.eclipseRotation = _val;
-    }
-
-    /**
-     * Gets the eclipse start angle.
-     * @returns The eclipse start angle
-     */
-    getEclipseStartAngle() {
-      return this.eclipseStartAngle;
-    }
-
-    /**
-     * Sets the eclipse start angle.
-     * @param _val - The eclipse start angle
-     */
-    setEclipseStartAngle(_val: number) {
-      this.eclipseStartAngle = _val;
-    }
-
-    /**
-     * Gets the eclipse end angle.
-     * @returns The eclipse end angle
-     */
-    getEclipseEndAngle() {
-      return this.eclipseEndAngle;
-    }
-
-    /**
-     * Sets the eclipse end angle.
-     * @param _val - The eclipse end angle
-     */
-    setEclipseEndAngle(_val: number) {
-      this.eclipseEndAngle = _val;
+    setIsEclipse(isEclipse: boolean) {
+      this.isEclipse = isEclipse;
     }
   }
 
-  /** Handles the costumes of the sprite. */
+  /**
+   * Manages costumes (appearances) for sprites.
+   * Handles multiple costumes and switching between them.
+   */
   class Costumes {
-    /** The costumes */
+    /** Map of costume IDs to their corresponding textures */
     private costumes: { [id: string]: WebGLTexture | null };
-    /** The current costume */
+    /** ID of the currently active costume */
     private id: string;
 
     /**
-     * Constructor for the Costumes class.
+     * Creates a new Costumes manager with a default "NONE" costume.
+     * The "NONE" costume is a special costume that represents no texture.
      */
     constructor() {
       this.costumes = {
@@ -2582,21 +2602,24 @@ export namespace Neutron {
     }
 
     /**
-     * Adds a costume.
-     * @param id - The id
-     * @param image - The image
+     * Adds a new costume to the sprite.
+     *
+     * @param id - Unique identifier for the costume
+     * @param texture - The WebGL texture for the costume, or null for no texture
+     * @throws Error if the costume ID is "NONE" (reserved)
      */
-    addCostume(id: string, image: WebGLTexture | null) {
+    addCostume(id: string, texture: WebGLTexture | null) {
       if (id.toUpperCase() === `NONE`) {
         throw new Error(`Cannot add Costume as Id 'None'!`);
       }
 
-      this.costumes[id] = image;
+      this.costumes[id] = texture;
     }
 
     /**
-     * Sets the costume by id.
-     * @param id - The id
+     * Sets the active costume by its ID.
+     *
+     * @param id - The ID of the costume to activate
      */
     setCostumeById(id: string) {
       if (id.toUpperCase() === `NONE`) {
@@ -2607,22 +2630,33 @@ export namespace Neutron {
     }
 
     /**
-     * Gets the costume.
-     * @returns The costume
+     * Gets the currently active costume's texture.
+     *
+     * @returns The WebGL texture of the active costume, or null if no texture
      */
     getCostume() {
+      return this.costumes[this.id];
+    }
+
+    /**
+     * Gets the WebGL texture of the currently active costume.
+     *
+     * @returns The WebGL texture, or null if no texture is set
+     */
+    getTexture(): WebGLTexture | null {
       return this.costumes[this.id];
     }
   }
 
   /** Handles the collision of the sprite. */
   class Collision {
-    /** Self sprite */
+    /** The sprite this collision manager belongs to */
     private me: Sprite;
 
     /**
-     * Constructor for the Collision class.
-     * @param me - Self sprite
+     * Creates a new collision manager for a sprite.
+     *
+     * @param sprite - The sprite this collision manager belongs to
      */
     constructor(me: Sprite) {
       this.me = me;
@@ -2718,31 +2752,10 @@ export namespace Neutron {
     }
   }
 
-  export class Particle {
-    /** The id of the particle. */
-    private id: string;
-    /** The x position of the particle. */
-    private x: number;
-    /** The y position of the particle. */
-    private y: number;
-    /** The width of the particle. */
-    private width: number;
-    /** The height of the particle. */
-    private height: number;
-    /** The color of the particle. */
-    private color: string;
-    /** The velocity of the particle on the x axis. */
-    private vx: number;
-    /** The velocity of the particle on the y axis. */
-    private vy: number;
-    /** The maximum velocity of the particle on the x axis. */
-    private maxVX: number | null;
-    /** The maximum velocity of the particle on the y axis. */
-    private maxVY: number | null;
-    /** The transparency of the particle. */
-    private transparency: number;
-    /** Whether the particle is an eclipse. */
-    private isEclipse: boolean;
+  /** A particle game object that can be extended to create your own particles. */
+  export class Particle extends GameObject {
+    /** The effects of the particle */
+    private effects: Effects;
 
     /**
      * Constructor for the Particle class.
@@ -2751,7 +2764,7 @@ export namespace Neutron {
      * @param y - The y position of the particle
      * @param width - The width of the particle
      * @param height - The height of the particle
-     * @param color - The color of the particle
+     * @param color - The color of the particle in hexadecimal format
      */
     constructor(
       id: string,
@@ -2761,229 +2774,16 @@ export namespace Neutron {
       height: number,
       color: string
     ) {
-      if (getGame().getParticleById(id)) {
-        throw new Error(`Particle with id ${id} already exists`);
-      }
-      this.id = id;
-      this.x = x;
-      this.y = y;
-      this.width = width;
-      this.height = height;
-      this.color = color;
-      this.vx = 0;
-      this.vy = 0;
-      this.maxVX = null;
-      this.maxVY = null;
-      this.transparency = 0;
-      this.isEclipse = false;
+      super(id, x, y, width, height, color);
+      this.effects = new Effects();
     }
 
     /**
-     * Updates the particle.
+     * Gets the effects of the particle.
+     * @returns The effects of the particle
      */
-    update() {
-      this.x += this.vx;
-      this.y += this.vy;
-
-      if (this.maxVX !== null) {
-        if (this.vx > this.maxVX) {
-          this.vx = this.maxVX;
-        } else if (this.vx < -this.maxVX) {
-          this.vx = -this.maxVX;
-        }
-      }
-
-      if (this.maxVY !== null) {
-        if (this.vy > this.maxVY) {
-          this.vy = this.maxVY;
-        } else if (this.vy < -this.maxVY) {
-          this.vy = -this.maxVY;
-        }
-      }
-    }
-
-    /**
-     * Gets the id of the particle.
-     * @returns The id of the particle
-     */
-    getId() {
-      return this.id;
-    }
-
-    /**
-     * Gets the x position of the particle.
-     * @returns The x position of the particle
-     */
-    getX() {
-      return this.x;
-    }
-
-    /**
-     * Sets the x position of the particle.
-     * @param x - The x position of the particle
-     */
-    setX(x: number) {
-      this.x = x;
-    }
-
-    /**
-     * Gets the y position of the particle.
-     * @returns The y position of the particle
-     */
-    getY() {
-      return this.y;
-    }
-
-    /**
-     * Sets the y position of the particle.
-     * @param y - The y position of the particle
-     */
-    setY(y: number) {
-      this.y = y;
-    }
-
-    /**
-     * Gets the width of the particle.
-     * @returns The width of the particle
-     */
-    getWidth() {
-      return this.width;
-    }
-
-    /**
-     * Sets the width of the particle.
-     * @param width - The width of the particle
-     */
-    setWidth(width: number) {
-      this.width = width;
-    }
-
-    /**
-     * Gets the height of the particle.
-     * @returns The height of the particle
-     */
-    getHeight() {
-      return this.height;
-    }
-
-    /**
-     * Sets the height of the particle.
-     * @param height - The height of the particle
-     */
-    setHeight(height: number) {
-      this.height = height;
-    }
-
-    /**
-     * Gets the color of the particle.
-     * @returns The color of the particle
-     */
-    getColor() {
-      return this.color;
-    }
-
-    /**
-     * Sets the color of the particle.
-     * @param color - The color of the particle
-     */
-    setColor(color: string) {
-      this.color = color;
-    }
-
-    /**
-     * Gets the velocity of the particle on the x axis.
-     * @returns The velocity of the particle on the x axis
-     */
-    getVX() {
-      return this.vx;
-    }
-
-    /**
-     * Sets the velocity of the particle on the x axis.
-     * @param vx - The velocity of the particle on the x axis
-     */
-    setVX(vx: number) {
-      this.vx = vx;
-    }
-
-    /**
-     * Gets the velocity of the particle on the y axis.
-     * @returns The velocity of the particle on the y axis
-     */
-    getVY() {
-      return this.vy;
-    }
-
-    /**
-     * Sets the velocity of the particle on the y axis.
-     * @param vy - The velocity of the particle on the y axis
-     */
-    setVY(vy: number) {
-      this.vy = vy;
-    }
-
-    /**
-     * Gets the maximum velocity of the particle on the x axis.
-     * @returns The maximum velocity of the particle on the x axis
-     */
-    getMaxVX() {
-      return this.maxVX;
-    }
-
-    /**
-     * Sets the maximum velocity of the particle on the x axis.
-     * @param maxVX - The maximum velocity of the particle on the x axis
-     */
-    setMaxVX(maxVX: number | null) {
-      this.maxVX = maxVX;
-    }
-
-    /**
-     * Gets the maximum velocity of the particle on the y axis.
-     * @returns The maximum velocity of the particle on the y axis
-     */
-    getMaxVY() {
-      return this.maxVY;
-    }
-
-    /**
-     * Sets the maximum velocity of the particle on the y axis.
-     * @param maxVY - The maximum velocity of the particle on the y axis
-     */
-    setMaxVY(maxVY: number | null) {
-      this.maxVY = maxVY;
-    }
-
-    /**
-     * Gets the transparency of the particle.
-     * @returns The transparency of the particle
-     */
-    getTransparency() {
-      return this.transparency;
-    }
-
-    /**
-     * Sets the transparency of the particle.
-     * @param transparency - The transparency of the particle
-     */
-    setTransparency(transparency: number) {
-      this.transparency = transparency;
-    }
-
-    /**
-     * Gets whether the particle is an eclipse.
-     * @returns Whether the particle is an eclipse
-     */
-    getIsEclipse() {
-      return this.isEclipse;
-    }
-
-    /**
-     * Sets whether the particle is an eclipse.
-     * @param isEclipse - Whether the particle is an eclipse
-     */
-    setIsEclipse(isEclipse: boolean) {
-      this.isEclipse = isEclipse;
+    getEffects() {
+      return this.effects;
     }
   }
 
@@ -3339,11 +3139,55 @@ export namespace Neutron {
 
   const engine = new Engine();
 
+  /**
+   * Gets the engine instance.
+   * @returns The engine instance
+   */
   export const getEngine = (): Engine => engine;
+
+  /**
+   * Gets the render instance.
+   * @returns The render instance
+   */
   export let getRender: () => Render;
+
+  /**
+   * Gets the loader instance.
+   * @returns The loader instance
+   */
   export let getLoader: () => Loader;
+
+  /**
+   * Gets the events instance.
+   * @returns The events instance
+   */
   export let getEvents: () => Events;
+
+  /**
+   * Gets the controller instance.
+   * @returns The controller instance
+   */
   export let getController: () => Controller;
+
+  /**
+   * Gets the game instance.
+   * @returns The game instance
+   */
   export let getGame: () => Game;
+
+  /**
+   * Gets the camera instance.
+   * @returns The camera instance
+   */
   export let getCamera: () => Camera;
+
+  /**
+   * Initializes the engine.
+   * @param engineSettings - The engine settings
+   */
+  export let init: (engineSettings: EngineSettings) => void = (
+    engineSettings: EngineSettings
+  ) => {
+    engine.init(engineSettings);
+  };
 }

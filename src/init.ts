@@ -2,7 +2,7 @@ import { Neutron } from "./neutron/neutron.ts";
 import { draw, init, load, update } from "./main.ts";
 import { Events } from "./events.ts";
 
-Neutron.getEngine().init({
+Neutron.init({
   tps: 75,
 
   scale: 2,
