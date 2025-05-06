@@ -1049,8 +1049,8 @@ export namespace Neutron {
       this.ctx.blendFunc(this.ctx.SRC_ALPHA, this.ctx.ONE_MINUS_SRC_ALPHA);
 
       const positions = this.createEclipseVertices(
-        x,
-        y,
+        x - this.getWidth() / 2,
+        y - this.getHeight() / 2,
         width / 2,
         height / 2,
         this.eclipseSegments
