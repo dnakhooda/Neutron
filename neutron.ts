@@ -390,6 +390,8 @@ export namespace Neutron {
     private eclipseSegments: number;
     /** The Scale */
     private scale: number;
+    /** The Projected Matrix */
+    private projectedMatrix: Float32Array;
     /** The Full Screen Ratio */
     private fullScreenRatio: [number, number] | null;
     /** The Draw Function */
@@ -608,6 +610,16 @@ export namespace Neutron {
       this.ctx.bindVertexArray(null);
 
       this.ctx.viewport(0, 0, this.canvas.width, this.canvas.height);
+
+      this.projectedMatrix = this.orthographic(
+        0,
+        this.canvas.width,
+        this.canvas.height,
+        0
+      );
+
+      this.ctx.enable(this.ctx.BLEND);
+      this.ctx.blendFunc(this.ctx.SRC_ALPHA, this.ctx.ONE_MINUS_SRC_ALPHA);
     }
 
     /**
@@ -777,9 +789,6 @@ export namespace Neutron {
       );
       this.ctx.uniform1i(uUseTexture, 0);
 
-      this.ctx.enable(this.ctx.BLEND);
-      this.ctx.blendFunc(this.ctx.SRC_ALPHA, this.ctx.ONE_MINUS_SRC_ALPHA);
-
       const positions = [
         -width / 2,
         -height / 2,
@@ -810,23 +819,16 @@ export namespace Neutron {
         1,
       ];
 
-      const projMatrix = this.orthographic(
-        0,
-        this.canvas.width,
-        this.canvas.height,
-        0
-      );
-
       const translationMatrix = new Float32Array([
         1, 0, 0, 0,
         0, 1, 0, 0,
         0, 0, 1, 0,
         x + width / 2, y + height / 2, 0, 1
-    ]);
+      ]);
 
       this.ctx.uniform1f(this.uAlpha, alpha);
 
-      this.ctx.uniformMatrix4fv(this.uProjection, false, projMatrix);
+      this.ctx.uniformMatrix4fv(this.uProjection, false, this.projectedMatrix);
       this.ctx.uniformMatrix4fv(this.uView, false, translationMatrix);
       this.ctx.uniformMatrix4fv(
         this.uModel,
@@ -901,9 +903,6 @@ export namespace Neutron {
       );
       this.ctx.uniform1i(uUseTexture, 1);
 
-      this.ctx.enable(this.ctx.BLEND);
-      this.ctx.blendFunc(this.ctx.SRC_ALPHA, this.ctx.ONE_MINUS_SRC_ALPHA);
-
       const positions = new Float32Array([
         -width / 2,
         -height / 2,
@@ -918,13 +917,6 @@ export namespace Neutron {
       const texcoords = new Float32Array([
         0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0,
       ]);
-
-      const projMatrix = this.orthographic(
-        0,
-        this.canvas.width,
-        this.canvas.height,
-        0
-      );
 
       const translationMatrix = new Float32Array([
         1,
@@ -952,7 +944,7 @@ export namespace Neutron {
       this.ctx.useProgram(this.shaderProgram);
 
       this.ctx.uniform1f(this.uAlpha, alpha);
-      this.ctx.uniformMatrix4fv(this.uProjection, false, projMatrix);
+      this.ctx.uniformMatrix4fv(this.uProjection, false, this.projectedMatrix);
       this.ctx.uniformMatrix4fv(this.uView, false, translationMatrix);
       this.ctx.uniformMatrix4fv(this.uModel, false, modelMatrix);
       this.ctx.uniform1f(this.uRotation, rotation);
@@ -1033,9 +1025,6 @@ export namespace Neutron {
       );
       this.ctx.uniform1i(uUseTexture, 0);
 
-      this.ctx.enable(this.ctx.BLEND);
-      this.ctx.blendFunc(this.ctx.SRC_ALPHA, this.ctx.ONE_MINUS_SRC_ALPHA);
-
       const positions = this.createEclipseVertices(
         width / 2,
         height / 2,
@@ -1051,13 +1040,6 @@ export namespace Neutron {
         colors[offset + 2] = color[2];
         colors[offset + 3] = 1.0;
       }
-
-      const projMatrix = this.orthographic(
-        0,
-        this.canvas.width,
-        this.canvas.height,
-        0
-      );
 
       const translationMatrix = new Float32Array([
         1,
@@ -1081,7 +1063,7 @@ export namespace Neutron {
       this.ctx.useProgram(this.shaderProgram);
 
       this.ctx.uniform1f(this.uAlpha, alpha);
-      this.ctx.uniformMatrix4fv(this.uProjection, false, projMatrix);
+      this.ctx.uniformMatrix4fv(this.uProjection, false, this.projectedMatrix);
       this.ctx.uniformMatrix4fv(this.uView, false, translationMatrix);
       this.ctx.uniformMatrix4fv(
         this.uModel,
@@ -1195,6 +1177,15 @@ export namespace Neutron {
       this.canvas.style.position = "absolute";
       this.canvas.style.left = "0";
       this.canvas.style.top = "0";
+
+      this.ctx.viewport(0, 0, this.canvas.width, this.canvas.height);
+
+      this.projectedMatrix = this.orthographic(
+        0,
+        this.canvas.width,
+        this.canvas.height,
+        0
+      );
     }
 
     /**
@@ -1211,6 +1202,15 @@ export namespace Neutron {
         this.canvas.style.width = `${window.innerHeight * (xRatio / yRatio)}px`;
         this.canvas.style.height = `${window.innerHeight}px`;
       }
+
+      this.ctx.viewport(0, 0, this.canvas.width, this.canvas.height);
+
+      this.projectedMatrix = this.orthographic(
+        0,
+        this.canvas.width,
+        this.canvas.height,
+        0
+      );
     }
 
     /**
