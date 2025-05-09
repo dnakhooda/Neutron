@@ -11,7 +11,7 @@
  * Neutron namespace provides a game engine framework for creating interactive applications;
  * includes core functionality for rendering, game state management, and event handling and more.
  */
-export namespace Neutron {
+namespace Neutron {
   /**
    * Interface defining the settings and components required to initialize the game engine.
    */
