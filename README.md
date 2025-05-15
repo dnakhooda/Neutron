@@ -2,7 +2,7 @@
 
 Neutron is a powerful framework and engine for creating web-based games and animations. Neutron provides flexible and easy-to-use tools for game development. Using your node package manager of choice, you can install Neutron into a new or existing TypeScript web application. Neutron takes heavy inspiration from Scratch. If you programmer looking to expand from what Scratch provides, Neutron is a great way to learn TypeScript and web game development.
 
-## Features
+## ✨ Features ✨
 
 - 🎮 Simple game development tools
 - ⚡ Powerful WebGL rendering engine
@@ -11,7 +11,7 @@ Neutron is a powerful framework and engine for creating web-based games and anim
 - 📱 Responsive design support
 - 🔧 Easy to integrate with existing web projects
 
-## Installation
+## 👨‍💻 Installation 👨‍💻
 
 Neutron is available as a Node.js package and can be installed using your preferred package manager:
 
@@ -26,7 +26,7 @@ yarn add neutron-game
 bun add neutron-game
 ```
 
-## Quick Start
+## 🎮 Quick Start 🎮
 
 Here's a basic example of a Neutron game:
 
@@ -176,7 +176,7 @@ Neutron.init({
 });
 ```
 
-## HTML Setup
+## 🧑‍💻 HTML Setup 🧑‍💻
 
 Add a canvas element to your HTML:
 
@@ -184,7 +184,7 @@ Add a canvas element to your HTML:
 <canvas id="canvas" width="800" height="600"></canvas>
 ```
 
-## Core Idea
+## ⚛ Core of Neutron ⚛
 
 There are seven main objects in Neutron, each with its respective purpose:
 
@@ -198,7 +198,7 @@ There are seven main objects in Neutron, each with its respective purpose:
 
 These objects contain many well-documented methods and features.
 
-## Documentation
+## 📝 Documentation 📝
 
 All features in Neutron are contained within the Neutron namespace. To access Neutron's features and explore its various methods, use the Neutron namespace.
 
