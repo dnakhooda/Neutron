@@ -50,6 +50,32 @@ class Player extends Neutron.Sprite {
     // Set the active costume
     this.getCostumes().setCostumeById(`player`);
   }
+
+  // This function runs every game tick
+  update() {
+    // Set movement speed
+    const speed = 5;
+
+    // Move up when up arrow is pressed
+    if (Neutron.getController().getKey("ArrowUp")) {
+      this.setY(this.getY() - speed);
+    }
+
+    // Move down when down arrow is pressed
+    if (Neutron.getController().getKey("ArrowDown")) {
+      this.setY(this.getY() + speed);
+    }
+
+    // Move left when left arrow is pressed
+    if (Neutron.getController().getKey("ArrowLeft")) {
+      this.setX(this.getX() - speed);
+    }
+
+    // Move right when right arrow is pressed
+    if (Neutron.getController().getKey("ArrowRight")) {
+      this.setX(this.getX() + speed);
+    }
+  }
 }
 
 // Function to load game assets (images and sounds)
