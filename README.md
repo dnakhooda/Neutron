@@ -37,6 +37,7 @@ import Neutron from "neutron-game";
 
 // Create a custom Player class that extends Neutron's Sprite class
 class Player extends Neutron.Sprite {
+
   constructor(x: number, y: number) {
     // Initialize the sprite with basic properties
     // Parameters: id, x, y, width, height, color, layer
