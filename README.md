@@ -150,6 +150,24 @@ Add a canvas element to your HTML:
 <canvas id="canvas" width="800" height="600"></canvas>
 ```
 
+## Core Idea
+
+There are seven main objects in Neutron, each with its respective purpose:
+
+- Engine (Neutron.getEngine())
+- Render (Neutron.getRender())
+- Loader (Neutron.getLoader())
+- Events (Neutron.getEvents())
+- Controller (Neutron.getController())
+- Game (Neutron.getGame())
+- Camera (Neutron.getCamera())
+
+These objects contain many well-documented methods and features.
+
+## Documentation
+
+All features in Neutron are contained within the Neutron namespace. To access Neutron's features and explore its various methods, use the Neutron namespace.
+
 ## Contributing
 
 Neutron's code is open for you to view and suggest improvements. You may clone, make pull requests, and fork Neutron.
