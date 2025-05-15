@@ -34,6 +34,8 @@ Here's a basic example of a Neutron game:
 // Import Neutron
 import Neutron from "neutron-game";
 
+
+
 // Create a custom Player class that extends Neutron's Sprite class
 class Player extends Neutron.Sprite {
   constructor(x: number, y: number) {
@@ -78,11 +80,15 @@ class Player extends Neutron.Sprite {
   }
 }
 
+
+
 // Function to load game assets (images and sounds)
 function load() {
   // Load the player image
   Neutron.getLoader().loadImage("player", "/player.png");
 }
+
+
 
 // Function to initialize the game
 function init() {
@@ -102,15 +108,21 @@ function init() {
   player.to(Neutron.ScreenPlaces.CENTER);
 }
 
+
+
 // Function called every game tick (60 times per second)
 function update() {
   // Add game logic here
 }
 
+
+
 // Function called every frame for rendering
 function draw() {
   // Add custom drawing code here
 }
+
+
 
 // Create a class to handle game events (keyboard, mouse, touch)
 class Events implements Neutron.Events {
@@ -146,6 +158,8 @@ class Events implements Neutron.Events {
   whileMouseDown(e: MouseEvent) {}
   whileTouchDown(e: TouchEvent) {}
 }
+
+
 
 // Initialize the game engine with configuration
 Neutron.init({
