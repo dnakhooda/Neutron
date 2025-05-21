@@ -176,9 +176,7 @@ Neutron.init({
 });
 ```
 
-## HTML Setup 🧑‍💻
-
-Add a canvas element to your HTML:
+Be sure to add a canvas element to your HTML:
 
 ```html
 <canvas id="canvas" width="800" height="600"></canvas>
@@ -200,7 +198,7 @@ These objects contain many well-documented methods and features.
 
 ## Documentation 📝
 
-All features in Neutron are contained within the Neutron namespace. To access Neutron's features and explore its various methods, use the Neutron namespace.
+The Neutron namespace contains all of Neutron's features and allows you to access its various methods. Read the descriptions of each method or function to learn its purpose and how to use it. 
 
 ## Contributing 🗣️
 
