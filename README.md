@@ -182,6 +182,10 @@ Be sure to add a canvas element to your HTML:
 <canvas id="canvas" width="800" height="600"></canvas>
 ```
 
+Now, using the arrow keys on your keyboard, you can move a player around your screen:
+
+![image](https://github.com/user-attachments/assets/6ca914d0-3759-4fbb-bebe-bb2ec3efd95b)
+
 ## Core of Neutron ⚛
 
 There are seven main objects in Neutron, each with its respective purpose:
