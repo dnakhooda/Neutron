@@ -188,7 +188,7 @@ Now, using the arrow keys on your keyboard, you can move your player around the 
 
 ## Core of Neutron ⚛
 
-There are seven main objects in Neutron, each with its respective purpose:
+There are seven main objects in Neutron, each with its own purpose:
 
 - Engine (Neutron.getEngine())
 - Render (Neutron.getRender())
@@ -197,8 +197,6 @@ There are seven main objects in Neutron, each with its respective purpose:
 - Controller (Neutron.getController())
 - Game (Neutron.getGame())
 - Camera (Neutron.getCamera())
-
-These objects contain many well-documented methods and features.
 
 ## Documentation 📝
 
