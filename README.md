@@ -178,7 +178,7 @@ Neutron.init({
 
 The sample code above uses a player.png image.
 
-Be sure to add a canvas element to your HTML:
+Also, be sure to add a canvas element to your HTML:
 
 ```html
 <canvas id="canvas" width="800" height="600"></canvas>
@@ -202,7 +202,7 @@ There are seven main objects in Neutron, each with its own purpose:
 
 ## Documentation 📝
 
-The Neutron namespace contains all of Neutron's features and allows you to access its various methods. Read the descriptions of each method or function to learn its purpose and how to use it. 
+The Neutron namespace contains all of Neutron's features. Read the descriptions of each method or function to learn its purpose and how to use it. 
 
 ## Contributing 🗣️
 
