@@ -176,6 +176,8 @@ Neutron.init({
 });
 ```
 
+The sample code above uses a player.png image.
+
 Be sure to add a canvas element to your HTML:
 
 ```html
