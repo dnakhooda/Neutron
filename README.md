@@ -176,7 +176,7 @@ Neutron.init({
 });
 ```
 
-The sample code above references a player.png image. To use it, either provide your own player.png file or update the image path.
+The sample code above uses a player.png image. To use it, either provide your own player.png file or update the image path.
 
 Also, be sure to add a canvas element to your HTML:
 
