@@ -474,12 +474,9 @@ namespace Neutron {
       this.ctx.compileShader(vertexShader);
 
       if (!this.ctx.getShaderParameter(vertexShader, this.ctx.COMPILE_STATUS)) {
+        const info = this.ctx.getShaderInfoLog(vertexShader);
         this.ctx.deleteShader(vertexShader);
-        throw new Error(
-          `Vertex shader compilation failed! Info: ${this.ctx.getShaderInfoLog(
-            vertexShader
-          )}`
-        );
+        throw new Error(`Vertex shader compilation failed! Info: ${info}`);
       }
 
       const fragmentShader = this.ctx.createShader(this.ctx.FRAGMENT_SHADER);
@@ -494,14 +491,15 @@ namespace Neutron {
       if (
         !this.ctx.getShaderParameter(fragmentShader, this.ctx.COMPILE_STATUS)
       ) {
-        throw new Error(
-          `Fragment shader compilation failed! Info: ${this.ctx.getShaderInfoLog(
-            fragmentShader
-          )}`
-        );
+        const info = this.ctx.getShaderInfoLog(fragmentShader);
+        this.ctx.deleteShader(fragmentShader);
+        throw new Error(`Fragment shader compilation failed! Info: ${info}`);
       }
 
       this.shaderProgram = this.ctx.createProgram();
+      if (!this.shaderProgram) {
+        throw new Error("Failed to create shader program.");
+      }
 
       this.ctx.attachShader(this.shaderProgram, vertexShader);
       this.ctx.attachShader(this.shaderProgram, fragmentShader);
@@ -510,12 +508,12 @@ namespace Neutron {
       if (
         !this.ctx.getProgramParameter(this.shaderProgram, this.ctx.LINK_STATUS)
       ) {
-        throw new Error(
-          `Program linking failed! Info: ${this.ctx.getProgramInfoLog(
-            this.shaderProgram
-          )}`
-        );
+        const info = this.ctx.getProgramInfoLog(this.shaderProgram);
+        throw new Error(`Program linking failed! Info: ${info}`);
       }
+
+      this.ctx.deleteShader(vertexShader);
+      this.ctx.deleteShader(fragmentShader);
 
       this.ctx.useProgram(this.shaderProgram);
 
@@ -569,14 +567,20 @@ namespace Neutron {
 
       this.positionBuffer = this.ctx.createBuffer();
       this.colorBuffer = this.ctx.createBuffer();
+      this.texcoordBuffer = this.ctx.createBuffer();
 
-      this.vao = this.ctx.createVertexArray();
+      const vao = this.ctx.createVertexArray();
+      if (!vao) {
+        throw new Error("Could not create Vertex Array Object");
+      }
+      this.vao = vao;
+
       this.ctx.bindVertexArray(this.vao);
 
       this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.positionBuffer);
-      this.ctx.enableVertexAttribArray(this.aPosition as number);
+      this.ctx.enableVertexAttribArray(this.aPosition);
       this.ctx.vertexAttribPointer(
-        this.aPosition as number,
+        this.aPosition,
         2,
         this.ctx.FLOAT,
         false,
@@ -585,9 +589,9 @@ namespace Neutron {
       );
 
       this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.colorBuffer);
-      this.ctx.enableVertexAttribArray(this.aColor as number);
+      this.ctx.enableVertexAttribArray(this.aColor);
       this.ctx.vertexAttribPointer(
-        this.aColor as number,
+        this.aColor,
         4,
         this.ctx.FLOAT,
         false,
@@ -595,7 +599,6 @@ namespace Neutron {
         0
       );
 
-      this.texcoordBuffer = this.ctx.createBuffer();
       this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.texcoordBuffer);
       this.ctx.enableVertexAttribArray(this.aTexcoord);
       this.ctx.vertexAttribPointer(
@@ -607,7 +610,7 @@ namespace Neutron {
         0
       );
 
-      this.ctx.bindVertexArray(null);
+      this.ctx.bindVertexArray(null); // Unbind VAO after setup
 
       this.ctx.viewport(0, 0, this.canvas.width, this.canvas.height);
 
@@ -783,6 +786,9 @@ namespace Neutron {
       alpha: number = 1,
       rotation: number = 0
     ): void {
+      this.ctx.useProgram(this.shaderProgram);
+      this.ctx.bindVertexArray(this.vao);
+
       const uUseTexture = this.ctx.getUniformLocation(
         this.shaderProgram,
         "u_useTexture"
@@ -800,7 +806,7 @@ namespace Neutron {
         height / 2,
       ];
 
-      const colors = [
+      const colors = new Float32Array([
         color[0],
         color[1],
         color[2],
@@ -817,29 +823,36 @@ namespace Neutron {
         color[1],
         color[2],
         1,
-      ];
+      ]);
 
       const translationMatrix = new Float32Array([
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        x + width / 2, y + height / 2, 0, 1
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        x + width / 2,
+        y + height / 2,
+        0,
+        1,
+      ]);
+
+      const modelMatrix = new Float32Array([
+        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
       ]);
 
       this.ctx.uniform1f(this.uAlpha, alpha);
-
       this.ctx.uniformMatrix4fv(this.uProjection, false, this.projectedMatrix);
       this.ctx.uniformMatrix4fv(this.uView, false, translationMatrix);
-      this.ctx.uniformMatrix4fv(
-        this.uModel,
-        false,
-        new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
-      );
-
+      this.ctx.uniformMatrix4fv(this.uModel, false, modelMatrix);
       this.ctx.uniform1f(this.uRotation, rotation);
-
-      this.ctx.useProgram(this.shaderProgram);
-      this.ctx.bindVertexArray(this.vao);
 
       this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.positionBuffer);
       this.ctx.bufferData(
@@ -847,9 +860,9 @@ namespace Neutron {
         new Float32Array(positions),
         this.ctx.STATIC_DRAW
       );
-
+      this.ctx.enableVertexAttribArray(this.aPosition);
       this.ctx.vertexAttribPointer(
-        this.aPosition as number,
+        this.aPosition,
         2,
         this.ctx.FLOAT,
         false,
@@ -858,24 +871,16 @@ namespace Neutron {
       );
 
       this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.colorBuffer);
-      this.ctx.bufferData(
-        this.ctx.ARRAY_BUFFER,
-        new Float32Array(colors),
-        this.ctx.STATIC_DRAW
-      );
+      this.ctx.bufferData(this.ctx.ARRAY_BUFFER, colors, this.ctx.STATIC_DRAW);
+      this.ctx.enableVertexAttribArray(this.aColor);
+      this.ctx.vertexAttribPointer(this.aColor, 4, this.ctx.FLOAT, false, 0, 0);
 
-      this.ctx.vertexAttribPointer(
-        this.aColor as number,
-        4,
-        this.ctx.FLOAT,
-        false,
-        0,
-        0
-      );
+      this.ctx.disableVertexAttribArray(this.aTexcoord);
 
       this.ctx.drawArrays(this.ctx.TRIANGLE_STRIP, 0, 4);
 
       this.ctx.bindVertexArray(null);
+      this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, null);
     }
 
     /**
@@ -897,6 +902,9 @@ namespace Neutron {
       alpha: number = 1,
       rotation: number = 0
     ) {
+      this.ctx.useProgram(this.shaderProgram);
+      this.ctx.bindVertexArray(this.vao);
+
       const uUseTexture = this.ctx.getUniformLocation(
         this.shaderProgram,
         "u_useTexture"
@@ -941,17 +949,11 @@ namespace Neutron {
         1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
       ]);
 
-      this.ctx.useProgram(this.shaderProgram);
-
       this.ctx.uniform1f(this.uAlpha, alpha);
       this.ctx.uniformMatrix4fv(this.uProjection, false, this.projectedMatrix);
       this.ctx.uniformMatrix4fv(this.uView, false, translationMatrix);
       this.ctx.uniformMatrix4fv(this.uModel, false, modelMatrix);
       this.ctx.uniform1f(this.uRotation, rotation);
-      this.ctx.uniform1i(
-        this.ctx.getUniformLocation(this.shaderProgram, "u_useTexture"),
-        1
-      );
 
       this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.positionBuffer);
       this.ctx.bufferData(
@@ -989,15 +991,17 @@ namespace Neutron {
 
       this.ctx.activeTexture(this.ctx.TEXTURE0);
       this.ctx.bindTexture(this.ctx.TEXTURE_2D, image);
-      const uTexture = this.ctx.getUniformLocation(
+      const uTextureSampler = this.ctx.getUniformLocation(
         this.shaderProgram,
         "u_texture"
       );
-      this.ctx.uniform1i(uTexture, 0);
+      this.ctx.uniform1i(uTextureSampler, 0);
 
       this.ctx.drawArrays(this.ctx.TRIANGLE_STRIP, 0, 4);
 
+      this.ctx.bindVertexArray(null);
       this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, null);
+      this.ctx.bindTexture(this.ctx.TEXTURE_2D, null);
     }
 
     /**
@@ -1019,6 +1023,9 @@ namespace Neutron {
       alpha: number = 1,
       rotation: number = 0
     ) {
+      this.ctx.useProgram(this.shaderProgram);
+      this.ctx.bindVertexArray(this.vao);
+
       const uUseTexture = this.ctx.getUniformLocation(
         this.shaderProgram,
         "u_useTexture"
@@ -1060,21 +1067,15 @@ namespace Neutron {
         1,
       ]);
 
-      this.ctx.useProgram(this.shaderProgram);
+      const modelMatrix = new Float32Array([
+        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
+      ]);
 
       this.ctx.uniform1f(this.uAlpha, alpha);
       this.ctx.uniformMatrix4fv(this.uProjection, false, this.projectedMatrix);
       this.ctx.uniformMatrix4fv(this.uView, false, translationMatrix);
-      this.ctx.uniformMatrix4fv(
-        this.uModel,
-        false,
-        new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
-      );
+      this.ctx.uniformMatrix4fv(this.uModel, false, modelMatrix);
       this.ctx.uniform1f(this.uRotation, rotation);
-      this.ctx.uniform1i(
-        this.ctx.getUniformLocation(this.shaderProgram, "u_useTexture"),
-        0
-      );
 
       this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.positionBuffer);
       this.ctx.bufferData(
@@ -1101,6 +1102,7 @@ namespace Neutron {
 
       this.ctx.drawArrays(this.ctx.TRIANGLE_FAN, 0, numVertices);
 
+      this.ctx.bindVertexArray(null);
       this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, null);
     }
 
@@ -1117,18 +1119,18 @@ namespace Neutron {
       rx: number,
       ry: number,
       segments: number = 100
-  ): number[] {
+    ): number[] {
       const vertices = [0, 0];
-  
+
       for (let i = 0; i <= segments; i++) {
-          const theta = (i / segments) * 2 * Math.PI;
-          const x = rx * Math.cos(theta);
-          const y = ry * Math.sin(theta);
-          vertices.push(x, y);
+        const theta = (i / segments) * 2 * Math.PI;
+        const x = rx * Math.cos(theta);
+        const y = ry * Math.sin(theta);
+        vertices.push(x, y);
       }
-  
+
       return vertices;
-  }
+    }
 
     /**
      * Orthographic projection.
@@ -2215,25 +2217,25 @@ namespace Neutron {
      */
     to(place: ScreenPlaces) {
       switch (place) {
-        case ScreenPlaces.center:
+        case ScreenPlaces.CENTER:
           this.goTo(
             getRender().getWidth() / 2 - this.getWidth() / 2,
             getRender().getHeight() / 2 - this.getHeight() / 2
           );
           break;
-        case ScreenPlaces.verticalCenter:
+        case ScreenPlaces.VERTICAL_CENTER:
           this.goTo(
             this.getX(),
             getRender().getHeight() / 2 - this.getHeight() / 2
           );
           break;
-        case ScreenPlaces.horizontalCenter:
+        case ScreenPlaces.HORIZONTAL_CENTER:
           this.goTo(
             getRender().getWidth() / 2 - this.getWidth() / 2,
             this.getY()
           );
           break;
-        case ScreenPlaces.randomPosition:
+        case ScreenPlaces.RANDOM_POSITION:
           this.goTo(
             Math.floor(Math.random() * getRender().getWidth()),
             Math.floor(Math.random() * getRender().getHeight())
@@ -3115,10 +3117,10 @@ namespace Neutron {
 
   /** The places on the screen. */
   export enum ScreenPlaces {
-    center,
-    verticalCenter,
-    horizontalCenter,
-    randomPosition,
+    CENTER,
+    VERTICAL_CENTER,
+    HORIZONTAL_CENTER,
+    RANDOM_POSITION,
   }
 
   const engine = new Engine();
