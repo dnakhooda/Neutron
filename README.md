@@ -4,12 +4,12 @@ Neutron is a framework and engine for creating web-based games and animations. U
 
 ## Features ✨
 
-- 🎮 Simple game development tools
-- ⚡ WebGL rendering engine
-- 🎯 Collision detection and 2d Physics Engine
-- 🎵 Audio and Image support
-- 📱 Responsive design support
-- 🔧 Easy to integrate with existing web projects
+- Simple game development tools
+- WebGL rendering engine
+- Collision detection and 2d Physics Engine
+- Audio and Image support
+- Responsive design support
+- Easy to integrate with existing web projects
 
 ## Installation 👨‍💻
 
